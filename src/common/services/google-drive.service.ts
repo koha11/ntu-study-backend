@@ -27,8 +27,9 @@ export class GoogleDriveService {
         auth: apiKey,
       });
       this.logger.log('Google Drive client initialized');
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         `Failed to initialize Google Drive client: ${error.message}`,
       );
     }

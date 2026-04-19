@@ -50,3 +50,5 @@ coverage/
 
 # NestJS specific
 .eslintcache
+
+docs
