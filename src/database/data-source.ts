@@ -19,6 +19,12 @@ export const dataSourceOptions: DataSourceOptions = {
     process.env.DB_LOGGING === 'true' || process.env.NODE_ENV === 'development',
   dropSchema: false,
   migrationsRun: true,
+  ssl: true,
+  extra: {
+    ssl: {
+      rejectUnauthorized: false,
+    },
+  },
 };
 
 export const AppDataSource = new DataSource(dataSourceOptions);
