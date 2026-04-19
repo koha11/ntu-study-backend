@@ -29,6 +29,10 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # Only sync the production build folder
-          local-dir: ./dist/ 
-          server-dir: ./dist/
+          # Sync only dist and package.json from project root
+          local-dir: ./
+          server-dir: ./
+          exclude: |
+            **/*
+            !dist/**
+            !package.json
