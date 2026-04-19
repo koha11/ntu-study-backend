@@ -13,7 +13,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "vitest", 
+    "test": "vitest",
     "test:watch": "vitest --watch",
     "test:cov": "vitest --coverage",
     "test:ui": "vitest --ui",
@@ -65,6 +65,7 @@
     "@types/supertest": "^6.0.2",
     "@vitest/coverage-v8": "^4.1.4",
     "@vitest/ui": "^4.1.4",
+    "copy-webpack-plugin": "^14.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
@@ -77,8 +78,10 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "tsconfig-paths-webpack-plugin": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "webpack": "^5.106.2"
   }
 }

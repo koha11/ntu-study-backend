@@ -4,6 +4,9 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
+// Determine if running in production (from dist folder) or development
+const isProduction = __dirname.includes('dist');
+
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -11,8 +14,18 @@ export const dataSourceOptions: DataSourceOptions = {
   username: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'ntu_study',
-  entities: [path.join(__dirname, '../**/*.entity{.ts,.js}')],
-  migrations: [path.join(__dirname, './migrations/*{.ts,.js}')],
+  entities: [
+    path.join(
+      __dirname,
+      isProduction ? '../**/*.entity.js' : '../**/*.entity{.ts,.js}',
+    ),
+  ],
+  migrations: [
+    path.join(
+      __dirname,
+      isProduction ? '../migrations/*.js' : './migrations/*{.ts,.js}',
+    ),
+  ],
   subscribers: [],
   synchronize: false,
   logging:
