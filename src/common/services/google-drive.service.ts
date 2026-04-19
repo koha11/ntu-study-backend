@@ -1,63 +1,52 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { google, drive_v3 } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class GoogleDriveService {
   private readonly logger = new Logger(GoogleDriveService.name);
-  private driveClient!: drive_v3.Drive;
 
-  constructor(private configService: ConfigService) {
-    this.initializeDriveClient();
-  }
+  constructor() {}
 
-  private initializeDriveClient() {
-    const apiKey = this.configService.get<string>('GOOGLE_DRIVE_API_KEY');
+  /**
+   * Get authenticated Google Drive client using user's OAuth2 access token
+   * @param accessToken User's Google OAuth2 access token
+   * @returns Authenticated drive client
+   */
+  private getDriveClient(accessToken: string): drive_v3.Drive {
+    const oauth2Client = new OAuth2Client();
+    oauth2Client.setCredentials({
+      access_token: accessToken,
+    });
 
-    if (!apiKey) {
-      this.logger.warn(
-        'Google Drive API key not configured. Drive operations will be unavailable.',
-      );
-      return;
-    }
-
-    try {
-      this.driveClient = google.drive({
-        version: 'v3',
-        auth: apiKey,
-      });
-      this.logger.log('Google Drive client initialized');
-    } catch (error: any) {
-      this.logger.error(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        `Failed to initialize Google Drive client: ${error.message}`,
-      );
-    }
+    return google.drive({
+      version: 'v3',
+      auth: oauth2Client,
+    });
   }
 
   /**
    * Create a folder in Google Drive
+   * @param accessToken User's Google OAuth2 access token
    * @param folderName Name of the folder to create
    * @param parentFolderId Optional parent folder ID
    * @returns Folder metadata
    */
   async createFolder(
+    accessToken: string,
     folderName: string,
     parentFolderId?: string,
   ): Promise<any> {
-    if (!this.driveClient) {
-      this.logger.error('Google Drive client not initialized');
-      return null;
-    }
-
     try {
+      const driveClient = this.getDriveClient(accessToken);
+
       const fileMetadata = {
         name: folderName,
         mimeType: 'application/vnd.google-apps.folder',
         parents: parentFolderId ? [parentFolderId] : undefined,
       };
 
-      const response = await this.driveClient.files.create({
+      const response = await driveClient.files.create({
         requestBody: fileMetadata,
         fields: 'id, name, webViewLink',
       } as any);
@@ -76,6 +65,7 @@ export class GoogleDriveService {
 
   /**
    * Upload a file to Google Drive
+   * @param accessToken User's Google OAuth2 access token
    * @param fileName Name of the file
    * @param fileContent File content (Buffer or Stream)
    * @param mimeType MIME type of the file
@@ -83,17 +73,15 @@ export class GoogleDriveService {
    * @returns File metadata
    */
   async uploadFile(
+    accessToken: string,
     fileName: string,
     fileContent: any,
     mimeType: string,
     parentFolderId?: string,
   ): Promise<any> {
-    if (!this.driveClient) {
-      this.logger.error('Google Drive client not initialized');
-      return null;
-    }
-
     try {
+      const driveClient = this.getDriveClient(accessToken);
+
       const fileMetadata = {
         name: fileName,
         parents: parentFolderId ? [parentFolderId] : undefined,
@@ -104,7 +92,7 @@ export class GoogleDriveService {
         body: fileContent,
       };
 
-      const response = await this.driveClient.files.create({
+      const response = await driveClient.files.create({
         requestBody: fileMetadata,
         media: media,
         fields: 'id, name, webViewLink',
@@ -122,19 +110,21 @@ export class GoogleDriveService {
 
   /**
    * List files in a folder
+   * @param accessToken User's Google OAuth2 access token
    * @param folderId Folder ID to list
    * @param pageSize Number of files to return
    * @returns List of files
    */
-  async listFiles(folderId: string, pageSize: number = 10): Promise<any[]> {
-    if (!this.driveClient) {
-      this.logger.error('Google Drive client not initialized');
-      return [];
-    }
-
+  async listFiles(
+    accessToken: string,
+    folderId: string,
+    pageSize: number = 10,
+  ): Promise<any[]> {
     try {
+      const driveClient = this.getDriveClient(accessToken);
+
       const query = `'${folderId}' in parents and trashed=false`;
-      const response = await this.driveClient.files.list({
+      const response = await driveClient.files.list({
         q: query,
         spaces: 'drive',
         pageSize: pageSize,
@@ -152,17 +142,15 @@ export class GoogleDriveService {
 
   /**
    * Delete a file or folder from Google Drive
+   * @param accessToken User's Google OAuth2 access token
    * @param fileId File or folder ID to delete
    * @returns Success status
    */
-  async deleteFile(fileId: string): Promise<boolean> {
-    if (!this.driveClient) {
-      this.logger.error('Google Drive client not initialized');
-      return false;
-    }
-
+  async deleteFile(accessToken: string, fileId: string): Promise<boolean> {
     try {
-      await this.driveClient.files.delete({
+      const driveClient = this.getDriveClient(accessToken);
+
+      await driveClient.files.delete({
         fileId: fileId,
       } as any);
 
@@ -178,23 +166,22 @@ export class GoogleDriveService {
 
   /**
    * Share a file or folder with a user
+   * @param accessToken User's Google OAuth2 access token
    * @param fileId File or folder ID
    * @param email Email address to share with
    * @param role Role: reader, commenter, writer, organizer
    * @returns Share metadata
    */
   async shareFile(
+    accessToken: string,
     fileId: string,
     email: string,
     role: string = 'reader',
   ): Promise<any> {
-    if (!this.driveClient) {
-      this.logger.error('Google Drive client not initialized');
-      return null;
-    }
-
     try {
-      const response = await this.driveClient.permissions.create({
+      const driveClient = this.getDriveClient(accessToken);
+
+      const response = await driveClient.permissions.create({
         fileId: fileId,
         requestBody: {
           role: role,
@@ -215,12 +202,14 @@ export class GoogleDriveService {
   }
 
   /**
-   * Sync group flashcard resources from Google Drive (placeholder)
+   * Sync group flashcard resources from Google Drive
+   * @param accessToken User's Google OAuth2 access token
    * @param groupId Group ID
    * @param driveFolderId Google Drive folder ID
    * @returns Sync status
    */
   async syncGroupFlashcards(
+    accessToken: string,
     groupId: string,
     driveFolderId: string,
   ): Promise<boolean> {
@@ -228,7 +217,7 @@ export class GoogleDriveService {
       `Sync requested for group ${groupId} from Drive folder ${driveFolderId}`,
     );
     // TODO: Implement actual sync logic
-    // 1. List files in driveFolderId
+    // 1. List files in driveFolderId using user's access token
     // 2. Parse flashcard content (CSV, JSON, etc.)
     // 3. Create/update flashcard records in database
     // 4. Link to group
