@@ -23,16 +23,15 @@ jobs:
           npm install
           npm run build
 
+      - name: Prepare Deployment Folder
+        run: cp package.json dist/
+
       - name: Sync Files via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # Sync only dist and package.json from project root
-          local-dir: ./
+          # Only sync the production build folder
+          local-dir: ./dist/
           server-dir: ./
-          exclude: |
-            **/*
-            !dist/**
-            !package.json
