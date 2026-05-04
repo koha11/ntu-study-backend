@@ -1,13 +1,32 @@
-import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
+import type { JwtRequestUser } from '@modules/auth/types/jwt-request-user';
 import { GroupsService } from './groups.service';
 import {
   CreateGroupDto,
+  CreateGroupCalendarEventDto,
+  CreateMeetEventDto,
+  ListGroupCalendarEventsQueryDto,
   UpdateGroupDto,
   InviteMemberDto,
 } from './dto/group.dto';
@@ -15,6 +34,7 @@ import {
 @ApiTags('Groups')
 @ApiBearerAuth('JWT')
 @Controller('groups')
+@UseGuards(JwtAuthGuard)
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 
@@ -33,9 +53,9 @@ export class GroupsController {
     },
   })
   @ApiResponse({ status: 400, description: 'Invalid input' })
-  create(@Body() _createGroupDto: CreateGroupDto) {
-    // TODO: Create group
-    return {};
+  create(@Req() req: Request, @Body() createGroupDto: CreateGroupDto) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.create(user.id, createGroupDto);
   }
 
   @Get()
@@ -53,18 +73,62 @@ export class GroupsController {
       ],
     },
   })
-  findUserGroups() {
-    // TODO: Get user's groups
-    return [];
+  findUserGroups(@Req() req: Request) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.findUserGroups(user.id);
+  }
+
+  @Get(':id/calendar/events')
+  @ApiOperation({
+    summary:
+      'List events from the group shared Google Calendar (proxied via leader token)',
+  })
+  @ApiResponse({ status: 200, description: 'Events listed' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  listCalendarEvents(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Query() query: ListGroupCalendarEventsQueryDto,
+  ) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.listGroupCalendarEvents(
+      id,
+      user.id,
+      query.time_min,
+      query.time_max,
+    );
+  }
+
+  @Post(':id/calendar/events')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create an event on the group shared calendar (leader only)' })
+  @ApiResponse({ status: 201, description: 'Event created' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  createGroupCalendarEvent(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: CreateGroupCalendarEventDto,
+  ) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.createGroupCalendarEventAndInvite(
+      id,
+      user.id,
+      body,
+    );
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get group details' })
   @ApiResponse({ status: 200, description: 'Group found' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Group not found' })
-  findOne(@Param('id') _id: string) {
-    // TODO: Get group by id
-    return {};
+  findOne(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.findOneForMember(id, user.id);
   }
 
   @Patch(':id')
@@ -72,9 +136,13 @@ export class GroupsController {
   @ApiResponse({ status: 200, description: 'Group updated' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Group not found' })
-  update(@Param('id') _id: string, @Body() _updateGroupDto: UpdateGroupDto) {
-    // TODO: Update group
-    return {};
+  update(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() updateGroupDto: UpdateGroupDto,
+  ) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.update(id, user.id, updateGroupDto);
   }
 
   @Get(':id/members')
@@ -93,9 +161,34 @@ export class GroupsController {
       ],
     },
   })
-  getMembers(@Param('id') _id: string) {
-    // TODO: Get group members
-    return [];
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  getMembers(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.getMembers(id, user.id);
+  }
+
+  @Post(':id/calendar/meet-event')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      'Create a one-off Google Calendar event with Meet and invite active members (leader only)',
+  })
+  @ApiResponse({ status: 201, description: 'Event created' })
+  @ApiResponse({ status: 400, description: 'Invalid input or Calendar error' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  createMeetEvent(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() createMeetEventDto: CreateMeetEventDto,
+  ) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.createMeetEventAndInvite(
+      id,
+      user.id,
+      createMeetEventDto,
+    );
   }
 
   @Post(':id/members/invite')
@@ -105,23 +198,43 @@ export class GroupsController {
     description: 'Invitation sent',
   })
   @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  @ApiResponse({ status: 409, description: 'Conflict' })
   inviteMember(
-    @Param('id') _id: string,
-    @Body() _inviteMemberDto: InviteMemberDto,
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() inviteMemberDto: InviteMemberDto,
   ) {
-    // TODO: Invite member
-    return {};
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.inviteMember(id, user.id, inviteMemberDto.email);
   }
 
-  @Patch(':groupId/members/:userId/toggle')
+  @Patch(':id/members/:userId/toggle')
   @ApiOperation({ summary: 'Toggle member active status (leader only)' })
   @ApiResponse({ status: 200, description: 'Status updated' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Not found' })
   toggleMemberStatus(
-    @Param('groupId') _groupId: string,
-    @Param('userId') _userId: string,
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
   ) {
-    // TODO: Toggle member status
-    return {};
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.toggleMemberStatus(id, user.id, userId);
+  }
+
+  @Delete(':id/members/:userId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove member from group (leader only)' })
+  @ApiResponse({ status: 204, description: 'Member removed' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Not found' })
+  async removeMember(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ): Promise<void> {
+    const user = req.user as JwtRequestUser;
+    await this.groupsService.removeMember(id, user.id, userId);
   }
 }

@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
+import { NotificationDeliveryChannel } from '@common/enums';
 
 @Injectable()
 export class NotificationsService {
@@ -11,34 +12,47 @@ export class NotificationsService {
   ) {}
 
   async createNotification(
-    _notificationData: Partial<Notification>,
+    data: Pick<Notification, 'recipient_id' | 'type' | 'message'> &
+      Partial<
+        Pick<
+          Notification,
+          'related_entity_type' | 'related_entity_id' | 'delivery_channel'
+        >
+      >,
   ): Promise<Notification> {
-    // TODO: Create notification
-    throw new Error('Not implemented');
+    const notification = this.notificationsRepository.create({
+      recipient_id: data.recipient_id,
+      type: data.type,
+      message: data.message,
+      related_entity_type: data.related_entity_type,
+      related_entity_id: data.related_entity_id,
+      is_read: false,
+      delivery_channel:
+        data.delivery_channel ?? NotificationDeliveryChannel.WEB,
+    });
+    return this.notificationsRepository.save(notification);
   }
 
   async getUserNotifications(
-    _userId: string,
-    _unreadOnly?: boolean,
+    userId: string,
+    unreadOnly?: boolean,
   ): Promise<Notification[]> {
-    // TODO: Get user notifications
-    return [];
+    return this.notificationsRepository.find({
+      where: unreadOnly
+        ? { recipient_id: userId, is_read: false }
+        : { recipient_id: userId },
+      order: { created_at: 'DESC' },
+    });
   }
 
-  async markAsRead(_id: string): Promise<Notification> {
-    // TODO: Mark notification as read
-    throw new Error('Not implemented');
-  }
-
-  async sendEmailNotification(
-    _userId: string,
-    _subject: string,
-    _message: string,
-  ): Promise<void> {
-    // TODO: Send email notification
-  }
-
-  async sendTaskReminders(): Promise<void> {
-    // TODO: Send overdue task reminders (cron job)
+  async markAsRead(id: string, userId: string): Promise<Notification> {
+    const notification = await this.notificationsRepository.findOne({
+      where: { id },
+    });
+    if (!notification || notification.recipient_id !== userId) {
+      throw new NotFoundException('Notification not found');
+    }
+    notification.is_read = true;
+    return this.notificationsRepository.save(notification);
   }
 }

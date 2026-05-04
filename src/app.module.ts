@@ -17,8 +17,8 @@ import { ContributionsModule } from './modules/contributions/contributions.modul
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
+import { GoogleContactsModule } from './modules/google-contacts/google-contacts.module';
 import { AdminModule } from './modules/admin/admin.module';
-
 @Module({
   imports: [
     AppConfigModule,
@@ -37,6 +37,7 @@ import { AdminModule } from './modules/admin/admin.module';
     AuditLogsModule,
     NotificationsModule,
     GoogleDriveModule,
+    GoogleContactsModule,
     AdminModule,
   ],
   controllers: [AppController],

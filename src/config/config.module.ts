@@ -19,6 +19,12 @@ import * as Joi from 'joi';
         DB_NAME: Joi.string().required(),
         DB_SYNCHRONIZE: Joi.boolean().default(false),
         DB_LOGGING: Joi.boolean().default(false),
+        DB_SSL: Joi.boolean()
+          .truthy('true')
+          .truthy('1')
+          .falsy('false')
+          .falsy('0')
+          .default(false),
         JWT_SECRET: Joi.string().required(),
         JWT_EXPIRATION: Joi.number().default(3600),
         GOOGLE_CLIENT_ID: Joi.string().required(),

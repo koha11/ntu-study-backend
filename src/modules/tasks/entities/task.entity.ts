@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, OneToMany, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  Index,
+  JoinColumn,
+} from 'typeorm';
 import { TaskStatus } from '@common/enums';
 import { BaseEntity } from '@common/entities/base.entity';
 import { User } from '@modules/users/entities/user.entity';
@@ -31,6 +38,7 @@ export class Task extends BaseEntity {
     onDelete: 'CASCADE',
     nullable: true,
   })
+  @JoinColumn({ name: 'parent_task_id' })
   parent_task?: Task;
 
   @Column({ type: 'uuid', nullable: true })
@@ -49,6 +57,7 @@ export class Task extends BaseEntity {
     onDelete: 'SET NULL',
     nullable: true,
   })
+  @JoinColumn({ name: 'assignee_id' })
   assignee?: User;
 
   @Column({ type: 'uuid', nullable: true })

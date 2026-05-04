@@ -18,6 +18,12 @@ export class FlashcardSet extends BaseEntity {
   @Column({ type: 'varchar', length: 255 })
   name!: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  subject?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string | null;
+
   @Column({ type: 'int', default: 0 })
   card_count!: number;
 

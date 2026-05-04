@@ -28,7 +28,7 @@ export class Group extends BaseEntity {
   leader_id!: string;
 
   @Column({ type: 'date', nullable: true })
-  report_date?: Date;
+  report_date?: Date | null;
 
   @Column({ type: 'text', array: true, default: () => `'{}'` })
   tags!: string[];
@@ -40,10 +40,20 @@ export class Group extends BaseEntity {
   drive_folder_id?: string;
 
   @Column({ type: 'text', nullable: true })
-  canva_file_url?: string;
+  canva_file_url?: string | null;
 
   @Column({ type: 'text', nullable: true })
-  doc_file_url?: string;
+  canva_design_id?: string;
+
+  @Column({ type: 'text', nullable: true })
+  doc_file_url?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  meet_link?: string | null;
+
+  /** Google Calendar ID for the group's shared calendar (secondary calendar). */
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  google_calendar_id?: string | null;
 
   // Relationships
   @OneToMany(() => GroupMember, (member) => member.group, { cascade: true })

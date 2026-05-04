@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  DefaultValuePipe,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -7,42 +18,33 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
+import { AdminGuard } from '@modules/auth/guards/admin.guard';
+import { TaskSchedulerService } from '@common/services/task-scheduler.service';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT')
+@UseGuards(JwtAuthGuard, AdminGuard)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly taskSchedulerService: TaskSchedulerService,
+  ) {}
 
   @Get('users')
   @ApiOperation({ summary: 'List all users (admin only)' })
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
-  @ApiResponse({
-    status: 200,
-    description: 'Users retrieved',
-    schema: {
-      example: {
-        users: [
-          {
-            id: 'user-id-uuid',
-            email: 'user@example.ntu.edu.sg',
-            full_name: 'John Doe',
-            role: 'user',
-            locked: false,
-          },
-        ],
-        total: 100,
-      },
-    },
-  })
+  @ApiQuery({ name: 'q', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Users retrieved' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   findAllUsers(
-    @Query('skip') _skip: number = 0,
-    @Query('take') _take: number = 20,
+    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+    @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
+    @Query('q') q?: string,
   ) {
-    // TODO: Get all users
-    return { users: [], total: 0 };
+    return this.adminService.findAllUsers(skip, take, q);
   }
 
   @Post('users/:id/lock')
@@ -50,9 +52,8 @@ export class AdminController {
   @ApiResponse({ status: 200, description: 'User locked' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  lockUser(@Param('id') _id: string) {
-    // TODO: Lock user
-    return {};
+  lockUser(@Param('id') id: string) {
+    return this.adminService.lockUser(id);
   }
 
   @Post('users/:id/unlock')
@@ -60,67 +61,56 @@ export class AdminController {
   @ApiResponse({ status: 200, description: 'User unlocked' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  unlockUser(@Param('id') _id: string) {
-    // TODO: Unlock user
-    return {};
+  unlockUser(@Param('id') id: string) {
+    return this.adminService.unlockUser(id);
   }
 
   @Get('groups')
   @ApiOperation({ summary: 'List all groups (admin only)' })
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
-  @ApiResponse({
-    status: 200,
-    description: 'Groups retrieved',
-    schema: {
-      example: {
-        groups: [
-          {
-            id: 'group-id-uuid',
-            name: 'CS2040S Study Group',
-            member_count: 5,
-          },
-        ],
-        total: 50,
-      },
-    },
-  })
+  @ApiResponse({ status: 200, description: 'Groups retrieved' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   findAllGroups(
-    @Query('skip') _skip: number = 0,
-    @Query('take') _take: number = 20,
+    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+    @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
   ) {
-    // TODO: Get all groups
-    return { groups: [], total: 0 };
+    return this.adminService.findAllGroups(skip, take);
   }
 
-  @Post('groups/:id/delete')
+  @Delete('groups/:id')
+  @HttpCode(204)
   @ApiOperation({ summary: 'Delete group (admin only)' })
-  @ApiResponse({ status: 200, description: 'Group deleted' })
+  @ApiResponse({ status: 204, description: 'Group deleted' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Group not found' })
-  deleteGroup(@Param('id') _id: string) {
-    // TODO: Delete group
-    return {};
+  async deleteGroup(@Param('id') id: string): Promise<void> {
+    await this.adminService.deleteGroup(id);
   }
 
   @Get('dashboard')
-  @ApiOperation({ summary: 'Get dashboard statistics (admin only)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Dashboard data retrieved',
-    schema: {
-      example: {
-        total_users: 250,
-        total_groups: 45,
-        total_tasks: 1200,
-        active_sessions: 18,
-      },
-    },
+  @ApiOperation({
+    summary: 'Dashboard statistics and cron history (admin only)',
+    description:
+      'Includes totals, last-7-day cron aggregates, and recent cron_job_runs (v1 system log for scheduling).',
   })
+  @ApiResponse({ status: 200, description: 'Dashboard data retrieved' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   getDashboard() {
-    // TODO: Get dashboard stats
-    return {};
+    return this.adminService.getDashboard();
+  }
+
+  @Post('cron-jobs/:name/run')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Manually run a cron job by slug (admin only)',
+    description:
+      'Known names: overdue-task-reminders, notification-cleanup (see CRON_JOB_NAMES).',
+  })
+  @ApiResponse({ status: 204, description: 'Job finished (check cron_job_runs for status)' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Unknown job name' })
+  async runCronJob(@Param('name') name: string): Promise<void> {
+    await this.taskSchedulerService.runJobBySlug(name);
   }
 }

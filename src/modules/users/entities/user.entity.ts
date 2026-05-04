@@ -64,6 +64,19 @@ export class User extends BaseEntity {
   @Column({ type: 'timestamptz', nullable: true })
   last_login_at?: Date;
 
+  @Column({ type: 'text', nullable: true })
+  canva_access_token?: string;
+
+  @Column({ type: 'text', nullable: true })
+  canva_refresh_token?: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  canva_token_expires_at?: Date;
+
+  /** Monotonic counter; embedded in refresh JWT as `rv`. Increment on logout to revoke refresh tokens. */
+  @Column({ type: 'int', default: 0 })
+  refresh_token_version!: number;
+
   // Relationships
   @OneToMany(() => Group, (group) => group.leader)
   groups_led!: Group[];

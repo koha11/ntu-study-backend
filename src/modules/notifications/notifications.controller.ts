@@ -1,4 +1,12 @@
-import { Controller, Get, Patch, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -7,10 +15,14 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
+import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
+import type { JwtRequestUser } from '@modules/auth/types/jwt-request-user';
+import type { Request } from 'express';
 
 @ApiTags('Notifications')
 @ApiBearerAuth('JWT')
 @Controller('notifications')
+@UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
@@ -37,17 +49,28 @@ export class NotificationsController {
       ],
     },
   })
-  getUserNotifications(@Query('unread') _unread?: boolean) {
-    // TODO: Get user notifications
-    return [];
+  getUserNotifications(
+    @Req() req: Request & { user: JwtRequestUser },
+    @Query('unread') unread?: string,
+  ) {
+    const user = req.user;
+    const unreadOnly =
+      unread === 'true' || unread === '1' ? true : undefined;
+    return this.notificationsService.getUserNotifications(
+      user.id,
+      unreadOnly,
+    );
   }
 
   @Patch(':id/read')
   @ApiOperation({ summary: 'Mark notification as read' })
   @ApiResponse({ status: 200, description: 'Notification marked as read' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
-  markAsRead(@Param('id') _id: string) {
-    // TODO: Mark as read
-    return {};
+  markAsRead(
+    @Req() req: Request & { user: JwtRequestUser },
+    @Param('id') id: string,
+  ) {
+    const user = req.user;
+    return this.notificationsService.markAsRead(id, user.id);
   }
 }

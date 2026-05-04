@@ -143,4 +143,64 @@ export class EmailService {
       text: `${title}\n${message}`,
     });
   }
+
+  async sendTaskAssignedEmail(params: {
+    toEmail: string;
+    taskTitle: string;
+    groupName: string;
+    taskUrl: string;
+  }): Promise<boolean> {
+    const { toEmail, taskTitle, groupName, taskUrl } = params;
+    return this.send({
+      to: toEmail,
+      subject: `New task assigned: ${taskTitle}`,
+      html: `
+        <h2>You were assigned a task</h2>
+        <p>You have been assigned <strong>${taskTitle}</strong> in <strong>${groupName}</strong>.</p>
+        <p><a href="${taskUrl}">Open group tasks</a></p>
+      `,
+      text: `You were assigned "${taskTitle}" in ${groupName}.\n${taskUrl}`,
+    });
+  }
+
+  async sendTaskPendingReviewEmail(params: {
+    toEmail: string;
+    taskTitle: string;
+    groupName: string;
+    submitterName: string;
+    taskUrl: string;
+  }): Promise<boolean> {
+    const { toEmail, taskTitle, groupName, submitterName, taskUrl } = params;
+    return this.send({
+      to: toEmail,
+      subject: `Task ready for review: ${taskTitle}`,
+      html: `
+        <h2>Task submitted for review</h2>
+        <p><strong>${submitterName}</strong> submitted <strong>${taskTitle}</strong> in <strong>${groupName}</strong> for your review.</p>
+        <p><a href="${taskUrl}">Open group tasks</a></p>
+      `,
+      text: `${submitterName} submitted "${taskTitle}" in ${groupName} for review.\n${taskUrl}`,
+    });
+  }
+
+  async sendTaskReviewResultEmail(params: {
+    toEmail: string;
+    taskTitle: string;
+    groupName: string;
+    outcome: 'done' | 'failed';
+    taskUrl: string;
+  }): Promise<boolean> {
+    const { toEmail, taskTitle, groupName, outcome, taskUrl } = params;
+    const label = outcome === 'done' ? 'approved (Done)' : 'marked as Failed';
+    return this.send({
+      to: toEmail,
+      subject: `Task ${outcome === 'done' ? 'approved' : 'update'}: ${taskTitle}`,
+      html: `
+        <h2>Task ${label}</h2>
+        <p>Your task <strong>${taskTitle}</strong> in <strong>${groupName}</strong> was ${label}.</p>
+        <p><a href="${taskUrl}">Open group tasks</a></p>
+      `,
+      text: `Your task "${taskTitle}" in ${groupName} was ${label}.\n${taskUrl}`,
+    });
+  }
 }

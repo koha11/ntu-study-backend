@@ -26,6 +26,10 @@ export class CreateTaskDto {
 
   @IsOptional()
   due_date?: Date;
+
+  @IsUUID()
+  @IsOptional()
+  parent_task_id?: string;
 }
 
 export class UpdateTaskDto {

@@ -7,6 +7,12 @@ dotenv.config();
 // Determine if running in production (from dist folder) or development
 const isProduction = __dirname.includes('dist');
 
+/** Local Postgres usually has no SSL; managed DBs (Neon, RDS, etc.) need SSL. */
+function useDatabaseSsl(): boolean {
+  const v = process.env.DB_SSL;
+  return v === 'true' || v === '1';
+}
+
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -32,12 +38,18 @@ export const dataSourceOptions: DataSourceOptions = {
     process.env.DB_LOGGING === 'true' || process.env.NODE_ENV === 'development',
   dropSchema: false,
   migrationsRun: true,
-  ssl: true,
-  extra: {
-    ssl: {
-      rejectUnauthorized: false,
-    },
-  },
+  ...(useDatabaseSsl()
+    ? {
+        ssl: { rejectUnauthorized: false },
+        extra: {
+          ssl: {
+            rejectUnauthorized: false,
+          },
+        },
+      }
+    : {
+        ssl: false,
+      }),
 };
 
 export const AppDataSource = new DataSource(dataSourceOptions);
