@@ -5,6 +5,21 @@ import * as net from 'net';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 
+function shuffleArray<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function verifySmtp(transporter: Transporter): Promise<Error | null> {
+  return new Promise((resolve) => {
+    transporter.verify((err) => resolve(err ?? null));
+  });
+}
+
 export interface EmailOptions {
   to: string | string[];
   subject: string;
@@ -40,51 +55,120 @@ export class EmailService implements OnModuleInit {
       'test',
     );
 
+    const auth = { user: mailUser, pass: mailPassword };
+
     // Nodemailer picks a random A/AAAA address; IPv6 is often unreachable from cloud
     // hosts (e.g. Render → ENETUNREACH). Prefer IPv4 for remote SMTP hostnames.
-    let connectHost = mailHost;
-    let tlsServername: string | undefined;
     const skipIpv4Resolve =
       mailHost === 'localhost' ||
       mailHost === '127.0.0.1' ||
       net.isIP(mailHost) !== 0;
 
+    let ipv4List: string[] = [];
     if (!skipIpv4Resolve) {
       try {
-        const ipv4 = await dns.promises.resolve4(mailHost);
-        if (ipv4.length > 0) {
-          connectHost = ipv4[0];
-          tlsServername = mailHost;
-        }
+        ipv4List = await dns.promises.resolve4(mailHost);
       } catch {
-        // keep hostname; nodemailer will resolve as usual
+        ipv4List = [];
       }
     }
 
-    const portNum = Number(mailPort);
-    const secure = portNum === 465;
+    const candidates: Array<{ host: string; servername?: string }> =
+      ipv4List.length > 0
+        ? shuffleArray(ipv4List).map((ip) => ({
+            host: ip,
+            servername: mailHost,
+          }))
+        : [{ host: mailHost }];
 
-    this.transporter = nodemailer.createTransport({
-      host: connectHost,
-      port: portNum,
-      secure,
-      ...(tlsServername
-        ? { servername: tlsServername, tls: { servername: tlsServername } }
-        : {}),
-      auth: {
-        user: mailUser,
-        pass: mailPassword,
+    const primaryPort = Number(mailPort);
+    const portStrategies: Array<{
+      port: number;
+      secure: boolean;
+      requireTLS: boolean;
+    }> = [
+      {
+        port: primaryPort,
+        secure: primaryPort === 465,
+        requireTLS: primaryPort === 587,
       },
+    ];
+    // Some hosts block or flake on implicit TLS (465); Gmail also serves STARTTLS on 587.
+    if (primaryPort === 465) {
+      portStrategies.push({
+        port: 587,
+        secure: false,
+        requireTLS: true,
+      });
+    }
+
+    let lastError: Error | null = null;
+
+    for (const strategy of portStrategies) {
+      for (const cand of candidates) {
+        const transporter = nodemailer.createTransport({
+          host: cand.host,
+          port: strategy.port,
+          secure: strategy.secure,
+          requireTLS: strategy.requireTLS,
+          connectionTimeout: 20_000,
+          greetingTimeout: 15_000,
+          auth,
+          ...(cand.servername
+            ? {
+                servername: cand.servername,
+                tls: {
+                  servername: cand.servername,
+                  minVersion: 'TLSv1.2' as const,
+                },
+              }
+            : {}),
+        });
+
+        const err = await verifySmtp(transporter);
+        if (!err) {
+          this.transporter = transporter;
+          const via =
+            cand.servername && cand.host !== mailHost
+              ? ` (via ${cand.host})`
+              : '';
+          this.logger.log(
+            `Email service ready at ${mailHost}:${strategy.port}${via}`,
+          );
+          return;
+        }
+
+        lastError = err;
+        transporter.close();
+      }
+    }
+
+    const fallback = nodemailer.createTransport({
+      host: candidates[0].host,
+      port: portStrategies[0].port,
+      secure: portStrategies[0].secure,
+      requireTLS: portStrategies[0].requireTLS,
+      connectionTimeout: 20_000,
+      greetingTimeout: 15_000,
+      auth,
+      ...(candidates[0].servername
+        ? {
+            servername: candidates[0].servername,
+            tls: {
+              servername: candidates[0].servername,
+              minVersion: 'TLSv1.2' as const,
+            },
+          }
+        : {}),
     });
 
-    // Verify connection
-    this.transporter.verify((err) => {
-      if (err) {
-        this.logger.warn(`Email service connection failed: ${err.message}`);
-      } else {
-        this.logger.log(`Email service ready at ${mailHost}:${mailPort}`);
-      }
-    });
+    this.transporter = fallback;
+    this.logger.warn(
+      `Email service connection failed: ${lastError?.message ?? 'verify failed'}` +
+        (primaryPort === 465
+          ? ' — set MAIL_PORT=587 on your host if implicit TLS (465) is blocked.'
+          : ''),
+    );
   }
 
   async send(options: EmailOptions): Promise<boolean> {
