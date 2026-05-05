@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, OneToMany, Index } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany, Index, JoinColumn } from 'typeorm';
 import { BaseEntity } from '@common/entities/base.entity';
 import { User } from '@modules/users/entities/user.entity';
 import { Flashcard } from './flashcard.entity';
@@ -10,9 +10,10 @@ import { FlashcardStudyLog } from './flashcard-study-log.entity';
 @Index(['created_at'])
 export class FlashcardSet extends BaseEntity {
   @ManyToOne(() => User, (user) => user.flashcard_sets, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'owner_id' })
   owner!: User;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'owner_id', type: 'uuid' })
   owner_id!: string;
 
   @Column({ type: 'varchar', length: 255 })

@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, Index } from 'typeorm';
+import { Entity, Column, ManyToOne, Index, JoinColumn } from 'typeorm';
 import { DriveItemType } from '@common/enums';
 import { BaseEntity } from '@common/entities/base.entity';
 import { Group } from '@modules/groups/entities/group.entity';
@@ -10,9 +10,10 @@ import { Group } from '@modules/groups/entities/group.entity';
 @Index(['mime_type'])
 export class DriveItem extends BaseEntity {
   @ManyToOne(() => Group, (group) => group.drive_items, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'group_id' })
   group!: Group;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'group_id', type: 'uuid' })
   group_id!: string;
 
   @Column({ type: 'varchar', length: 255 })

@@ -15,7 +15,7 @@ export class GroupInvitation extends BaseEntity {
   @JoinColumn({ name: 'group_id' })
   group!: Group;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'group_id', type: 'uuid' })
   group_id!: string;
 
   @ManyToOne(() => User, (user) => user.invitations_sent, {
@@ -24,7 +24,7 @@ export class GroupInvitation extends BaseEntity {
   @JoinColumn({ name: 'invited_by_id' })
   invited_by!: User;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'invited_by_id', type: 'uuid' })
   invited_by_id!: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })

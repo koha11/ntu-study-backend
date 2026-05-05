@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, Index } from 'typeorm';
+import { Entity, Column, ManyToOne, Index, JoinColumn } from 'typeorm';
 import { AuditLogSource } from '@common/enums';
 import { BaseEntity } from '@common/entities/base.entity';
 import { Group } from '@modules/groups/entities/group.entity';
@@ -12,18 +12,20 @@ import { User } from '@modules/users/entities/user.entity';
 @Index(['created_at'])
 export class AuditLog extends BaseEntity {
   @ManyToOne(() => Group, (group) => group.audit_logs, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'group_id' })
   group!: Group;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'group_id', type: 'uuid' })
   group_id!: string;
 
   @ManyToOne(() => User, (user) => user.audit_logs, {
     onDelete: 'SET NULL',
     nullable: true,
   })
+  @JoinColumn({ name: 'actor_id' })
   actor?: User;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'actor_id', type: 'uuid', nullable: true })
   actor_id?: string;
 
   @Column({ type: 'varchar', length: 100 })

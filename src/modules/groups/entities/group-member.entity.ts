@@ -13,7 +13,7 @@ export class GroupMember extends BaseEntity {
   @JoinColumn({ name: 'group_id' })
   group!: Group;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'group_id', type: 'uuid' })
   group_id!: string;
 
   @ManyToOne(() => User, (user) => user.group_memberships, {
@@ -22,7 +22,7 @@ export class GroupMember extends BaseEntity {
   @JoinColumn({ name: 'user_id' })
   user!: User;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'user_id', type: 'uuid' })
   user_id!: string;
 
   @Column({ type: 'boolean', default: false })

@@ -29,9 +29,10 @@ export class Task extends BaseEntity {
     onDelete: 'CASCADE',
     nullable: true,
   })
+  @JoinColumn({ name: 'group_id' })
   group?: Group;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'group_id', type: 'uuid', nullable: true })
   group_id?: string;
 
   @ManyToOne(() => Task, (task) => task.subtasks, {
@@ -41,16 +42,17 @@ export class Task extends BaseEntity {
   @JoinColumn({ name: 'parent_task_id' })
   parent_task?: Task;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'parent_task_id', type: 'uuid', nullable: true })
   parent_task_id?: string;
 
   @OneToMany(() => Task, (task) => task.parent_task)
   subtasks!: Task[];
 
   @ManyToOne(() => User, (user) => user.tasks_created, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'created_by_id' })
   created_by!: User;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'created_by_id', type: 'uuid' })
   created_by_id!: string;
 
   @ManyToOne(() => User, (user) => user.tasks_assigned, {
@@ -60,7 +62,7 @@ export class Task extends BaseEntity {
   @JoinColumn({ name: 'assignee_id' })
   assignee?: User;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'assignee_id', type: 'uuid', nullable: true })
   assignee_id?: string;
 
   @Column({ type: 'enum', enum: TaskStatus, default: TaskStatus.TODO })
@@ -79,8 +81,9 @@ export class Task extends BaseEntity {
     onDelete: 'SET NULL',
     nullable: true,
   })
+  @JoinColumn({ name: 'reviewed_by_id' })
   reviewed_by?: User;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'reviewed_by_id', type: 'uuid', nullable: true })
   reviewed_by_id?: string;
 }

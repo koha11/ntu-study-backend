@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, Index, Check } from 'typeorm';
+import { Entity, Column, ManyToOne, Index, Check, JoinColumn } from 'typeorm';
 import { BaseEntity } from '@common/entities/base.entity';
 import { User } from '@modules/users/entities/user.entity';
 import { FlashcardSet } from './flashcard-set.entity';
@@ -10,17 +10,19 @@ import { FlashcardSet } from './flashcard-set.entity';
 @Index(['next_review_at'])
 export class FlashcardStudyLog extends BaseEntity {
   @ManyToOne(() => User, (user) => user.study_logs, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user!: User;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'user_id', type: 'uuid' })
   user_id!: string;
 
   @ManyToOne(() => FlashcardSet, (set) => set.study_logs, {
     onDelete: 'CASCADE',
   })
+  @JoinColumn({ name: 'set_id' })
   flashcard_set!: FlashcardSet;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'set_id', type: 'uuid' })
   set_id!: string;
 
   @Column({ type: 'smallint' })

@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, OneToMany, Index } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany, Index, JoinColumn } from 'typeorm';
 import { GroupStatus } from '@common/enums';
 import { BaseEntity } from '@common/entities/base.entity';
 import { User } from '@modules/users/entities/user.entity';
@@ -22,9 +22,10 @@ export class Group extends BaseEntity {
   description?: string;
 
   @ManyToOne(() => User, (user) => user.groups_led, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'leader_id' })
   leader!: User;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'leader_id', type: 'uuid' })
   leader_id!: string;
 
   @Column({ type: 'date', nullable: true })

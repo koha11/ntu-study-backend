@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, Unique, Index } from 'typeorm';
+import { Entity, Column, ManyToOne, Unique, Index, JoinColumn } from 'typeorm';
 import { BaseEntity } from '@common/entities/base.entity';
 import { FlashcardSet } from './flashcard-set.entity';
 import { Group } from '@modules/groups/entities/group.entity';
@@ -11,16 +11,18 @@ export class SharedGroupFlashcard extends BaseEntity {
   @ManyToOne(() => FlashcardSet, (set) => set.shared_groups, {
     onDelete: 'CASCADE',
   })
+  @JoinColumn({ name: 'set_id' })
   flashcard_set!: FlashcardSet;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'set_id', type: 'uuid' })
   set_id!: string;
 
   @ManyToOne(() => Group, (group) => group.shared_flashcards, {
     onDelete: 'CASCADE',
   })
+  @JoinColumn({ name: 'group_id' })
   group!: Group;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'group_id', type: 'uuid' })
   group_id!: string;
 }
