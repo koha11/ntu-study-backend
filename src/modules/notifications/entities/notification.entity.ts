@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, Index } from 'typeorm';
+import { Entity, Column, ManyToOne, Index, JoinColumn } from 'typeorm';
 import { NotificationDeliveryChannel } from '@common/enums';
 import { BaseEntity } from '@common/entities/base.entity';
 import { User } from '@modules/users/entities/user.entity';
@@ -10,9 +10,10 @@ import { User } from '@modules/users/entities/user.entity';
 @Index(['created_at'])
 export class Notification extends BaseEntity {
   @ManyToOne(() => User, (user) => user.notifications, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'recipient_id' })
   recipient!: User;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'recipient_id', type: 'uuid' })
   recipient_id!: string;
 
   @Column({ type: 'varchar', length: 100 })
