@@ -1,24 +1,7 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as dns from 'dns';
-import * as net from 'net';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
-
-function shuffleArray<T>(items: T[]): T[] {
-  const arr = [...items];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-function verifySmtp(transporter: Transporter): Promise<Error | null> {
-  return new Promise((resolve) => {
-    transporter.verify((err) => resolve(err ?? null));
-  });
-}
 
 export interface EmailOptions {
   to: string | string[];
@@ -30,20 +13,15 @@ export interface EmailOptions {
 }
 
 @Injectable()
-export class EmailService implements OnModuleInit {
+export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private transporter!: Transporter;
-  private readonly ready: Promise<void>;
 
   constructor(private configService: ConfigService) {
-    this.ready = this.initializeTransporter();
+    this.initializeTransporter();
   }
 
-  async onModuleInit() {
-    await this.ready;
-  }
-
-  private async initializeTransporter(): Promise<void> {
+  private initializeTransporter() {
     const mailHost = this.configService.get<string>('MAIL_HOST', 'localhost');
     const mailPort = this.configService.get<number>('MAIL_PORT', 1025);
     const mailUser = this.configService.get<string>(
@@ -55,124 +33,27 @@ export class EmailService implements OnModuleInit {
       'test',
     );
 
-    const auth = { user: mailUser, pass: mailPassword };
-
-    // Nodemailer picks a random A/AAAA address; IPv6 is often unreachable from cloud
-    // hosts (e.g. Render → ENETUNREACH). Prefer IPv4 for remote SMTP hostnames.
-    const skipIpv4Resolve =
-      mailHost === 'localhost' ||
-      mailHost === '127.0.0.1' ||
-      net.isIP(mailHost) !== 0;
-
-    let ipv4List: string[] = [];
-    if (!skipIpv4Resolve) {
-      try {
-        ipv4List = await dns.promises.resolve4(mailHost);
-      } catch {
-        ipv4List = [];
-      }
-    }
-
-    const candidates: Array<{ host: string; servername?: string }> =
-      ipv4List.length > 0
-        ? shuffleArray(ipv4List).map((ip) => ({
-            host: ip,
-            servername: mailHost,
-          }))
-        : [{ host: mailHost }];
-
-    const primaryPort = Number(mailPort);
-    const portStrategies: Array<{
-      port: number;
-      secure: boolean;
-      requireTLS: boolean;
-    }> = [
-      {
-        port: primaryPort,
-        secure: primaryPort === 465,
-        requireTLS: primaryPort === 587,
+    this.transporter = nodemailer.createTransport({
+      host: mailHost,
+      port: mailPort,
+      secure: mailPort === 465,
+      auth: {
+        user: mailUser,
+        pass: mailPassword,
       },
-    ];
-    // Some hosts block or flake on implicit TLS (465); Gmail also serves STARTTLS on 587.
-    if (primaryPort === 465) {
-      portStrategies.push({
-        port: 587,
-        secure: false,
-        requireTLS: true,
-      });
-    }
-
-    let lastError: Error | null = null;
-
-    for (const strategy of portStrategies) {
-      for (const cand of candidates) {
-        const transporter = nodemailer.createTransport({
-          host: cand.host,
-          port: strategy.port,
-          secure: strategy.secure,
-          requireTLS: strategy.requireTLS,
-          connectionTimeout: 20_000,
-          greetingTimeout: 15_000,
-          auth,
-          ...(cand.servername
-            ? {
-                servername: cand.servername,
-                tls: {
-                  servername: cand.servername,
-                  minVersion: 'TLSv1.2' as const,
-                },
-              }
-            : {}),
-        });
-
-        const err = await verifySmtp(transporter);
-        if (!err) {
-          this.transporter = transporter;
-          const via =
-            cand.servername && cand.host !== mailHost
-              ? ` (via ${cand.host})`
-              : '';
-          this.logger.log(
-            `Email service ready at ${mailHost}:${strategy.port}${via}`,
-          );
-          return;
-        }
-
-        lastError = err;
-        transporter.close();
-      }
-    }
-
-    const fallback = nodemailer.createTransport({
-      host: candidates[0].host,
-      port: portStrategies[0].port,
-      secure: portStrategies[0].secure,
-      requireTLS: portStrategies[0].requireTLS,
-      connectionTimeout: 20_000,
-      greetingTimeout: 15_000,
-      auth,
-      ...(candidates[0].servername
-        ? {
-            servername: candidates[0].servername,
-            tls: {
-              servername: candidates[0].servername,
-              minVersion: 'TLSv1.2' as const,
-            },
-          }
-        : {}),
     });
 
-    this.transporter = fallback;
-    this.logger.warn(
-      `Email service connection failed: ${lastError?.message ?? 'verify failed'}` +
-        (primaryPort === 465
-          ? ' — set MAIL_PORT=587 on your host if implicit TLS (465) is blocked.'
-          : ''),
-    );
+    // Verify connection
+    this.transporter.verify((err) => {
+      if (err) {
+        this.logger.warn(`Email service connection failed: ${err.message}`);
+      } else {
+        this.logger.log(`Email service ready at ${mailHost}:${mailPort}`);
+      }
+    });
   }
 
   async send(options: EmailOptions): Promise<boolean> {
-    await this.ready;
     try {
       const mailFrom = this.configService.get<string>(
         'MAIL_FROM',
