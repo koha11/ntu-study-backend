@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as dns from 'dns';
+import * as net from 'net';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 
@@ -13,15 +15,20 @@ export interface EmailOptions {
 }
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
   private transporter!: Transporter;
+  private readonly ready: Promise<void>;
 
   constructor(private configService: ConfigService) {
-    this.initializeTransporter();
+    this.ready = this.initializeTransporter();
   }
 
-  private initializeTransporter() {
+  async onModuleInit() {
+    await this.ready;
+  }
+
+  private async initializeTransporter(): Promise<void> {
     const mailHost = this.configService.get<string>('MAIL_HOST', 'localhost');
     const mailPort = this.configService.get<number>('MAIL_PORT', 1025);
     const mailUser = this.configService.get<string>(
@@ -33,10 +40,37 @@ export class EmailService {
       'test',
     );
 
+    // Nodemailer picks a random A/AAAA address; IPv6 is often unreachable from cloud
+    // hosts (e.g. Render → ENETUNREACH). Prefer IPv4 for remote SMTP hostnames.
+    let connectHost = mailHost;
+    let tlsServername: string | undefined;
+    const skipIpv4Resolve =
+      mailHost === 'localhost' ||
+      mailHost === '127.0.0.1' ||
+      net.isIP(mailHost) !== 0;
+
+    if (!skipIpv4Resolve) {
+      try {
+        const ipv4 = await dns.promises.resolve4(mailHost);
+        if (ipv4.length > 0) {
+          connectHost = ipv4[0];
+          tlsServername = mailHost;
+        }
+      } catch {
+        // keep hostname; nodemailer will resolve as usual
+      }
+    }
+
+    const portNum = Number(mailPort);
+    const secure = portNum === 465;
+
     this.transporter = nodemailer.createTransport({
-      host: mailHost,
-      port: mailPort,
-      secure: mailPort === 465,
+      host: connectHost,
+      port: portNum,
+      secure,
+      ...(tlsServername
+        ? { servername: tlsServername, tls: { servername: tlsServername } }
+        : {}),
       auth: {
         user: mailUser,
         pass: mailPassword,
@@ -54,6 +88,7 @@ export class EmailService {
   }
 
   async send(options: EmailOptions): Promise<boolean> {
+    await this.ready;
     try {
       const mailFrom = this.configService.get<string>(
         'MAIL_FROM',
