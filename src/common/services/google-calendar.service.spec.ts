@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { insertMock, listMock } = vi.hoisted(() => ({
+const { insertMock, listMock, calendarsInsertMock } = vi.hoisted(() => ({
   insertMock: vi.fn(),
   listMock: vi.fn(),
+  calendarsInsertMock: vi.fn(),
 }));
 
 vi.mock('googleapis', () => ({
@@ -11,6 +12,9 @@ vi.mock('googleapis', () => ({
       events: {
         insert: insertMock,
         list: listMock,
+      },
+      calendars: {
+        insert: calendarsInsertMock,
       },
     })),
   },
@@ -38,6 +42,11 @@ describe('GoogleCalendarService', () => {
       },
     });
     listMock.mockResolvedValue({ data: { items: [] } });
+    calendarsInsertMock.mockResolvedValue({
+      data: {
+        id: 'new-cal@group.calendar.google.com',
+      },
+    });
     service = new GoogleCalendarService();
   });
 
@@ -160,6 +169,42 @@ describe('GoogleCalendarService', () => {
         meet_link: 'https://meet.google.com/zzz',
       });
       expect(rows[1].start.date).toBe('2026-06-03');
+    });
+  });
+
+  describe('createSecondaryCalendar', () => {
+    it('calls calendars.insert with summary and returns calendar id', async () => {
+      const id = await service.createSecondaryCalendar('tok', 'CS2040 Study');
+
+      expect(calendarsInsertMock).toHaveBeenCalledWith({
+        requestBody: { summary: 'CS2040 Study' },
+      });
+      expect(id).toBe('new-cal@group.calendar.google.com');
+    });
+
+    it('passes description when provided', async () => {
+      await service.createSecondaryCalendar('tok', 'G1', 'NTU Study group calendar');
+
+      expect(calendarsInsertMock).toHaveBeenCalledWith({
+        requestBody: {
+          summary: 'G1',
+          description: 'NTU Study group calendar',
+        },
+      });
+    });
+
+    it('returns null when API returns no id', async () => {
+      calendarsInsertMock.mockResolvedValueOnce({ data: {} });
+
+      const id = await service.createSecondaryCalendar('tok', 'X');
+      expect(id).toBeNull();
+    });
+
+    it('returns null and does not throw when insert fails', async () => {
+      calendarsInsertMock.mockRejectedValueOnce(new Error('403 Forbidden'));
+
+      const id = await service.createSecondaryCalendar('tok', 'Y');
+      expect(id).toBeNull();
     });
   });
 

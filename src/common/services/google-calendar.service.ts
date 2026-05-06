@@ -65,6 +65,38 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Creates a secondary (group) calendar under the signed-in Google account.
+   * Returns the calendar `id` used as `google_calendar_id`, or null on failure.
+   */
+  async createSecondaryCalendar(
+    accessToken: string,
+    summary: string,
+    description?: string,
+  ): Promise<string | null> {
+    const title = summary.trim();
+    if (!title) {
+      return null;
+    }
+    try {
+      const calendar = this.getCalendarClient(accessToken);
+      const { data } = await calendar.calendars.insert({
+        requestBody: {
+          summary: title,
+          ...(description?.trim()
+            ? { description: description.trim() }
+            : {}),
+        },
+      });
+      const id = data.id?.trim();
+      return id || null;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to create secondary calendar: ${message}`);
+      return null;
+    }
+  }
+
+  /**
    * Lists events in a calendar within [timeMin, timeMax).
    */
   async listEventsInRange(

@@ -51,6 +51,7 @@ describe('GroupsService', () => {
     createEventWithMeetLink: ReturnType<typeof vi.fn>;
     listEventsInRange: ReturnType<typeof vi.fn>;
     createGroupCalendarEvent: ReturnType<typeof vi.fn>;
+    createSecondaryCalendar: ReturnType<typeof vi.fn>;
   };
   let googleAccessTokenService: {
     resolveGoogleAccessToken: ReturnType<typeof vi.fn>;
@@ -136,6 +137,7 @@ describe('GroupsService', () => {
         end: '2026-06-01T09:00:00.000Z',
         meet_link: 'https://meet.google.com/zzz',
       }),
+      createSecondaryCalendar: vi.fn().mockResolvedValue(null),
     };
 
     googleAccessTokenService = {
@@ -252,6 +254,46 @@ describe('GroupsService', () => {
       );
       expect(result.report_date).toBeInstanceOf(Date);
       expect(result.report_date?.toISOString().slice(0, 10)).toBe('2026-09-15');
+    });
+
+    it('sets google_calendar_id when Calendar API returns a calendar id', async () => {
+      googleCalendarService.createSecondaryCalendar.mockResolvedValue(
+        'g@group.calendar.google.com',
+      );
+
+      const result = await service.create(leaderId, { name: 'CalGroup' });
+
+      expect(
+        googleAccessTokenService.resolveGoogleAccessToken,
+      ).toHaveBeenCalledWith(expect.objectContaining({ id: leaderId }));
+      expect(googleCalendarService.createSecondaryCalendar).toHaveBeenCalledWith(
+        'google-access',
+        'CalGroup',
+        'Shared calendar for this NTU Study group.',
+      );
+      expect(result.google_calendar_id).toBe('g@group.calendar.google.com');
+    });
+
+    it('leaves google_calendar_id unset when Calendar API returns null', async () => {
+      googleCalendarService.createSecondaryCalendar.mockResolvedValue(null);
+
+      const result = await service.create(leaderId, { name: 'NoCal' });
+
+      expect(googleCalendarService.createSecondaryCalendar).toHaveBeenCalled();
+      expect(result.google_calendar_id).toBeUndefined();
+    });
+
+    it('skips calendar provisioning when Google token cannot be resolved', async () => {
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValueOnce(
+        null,
+      );
+
+      const result = await service.create(leaderId, { name: 'NoTok' });
+
+      expect(
+        googleCalendarService.createSecondaryCalendar,
+      ).not.toHaveBeenCalled();
+      expect(result.google_calendar_id).toBeUndefined();
     });
   });
 

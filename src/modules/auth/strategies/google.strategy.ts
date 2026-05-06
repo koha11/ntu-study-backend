@@ -25,6 +25,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/drive.activity.readonly',
         'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/calendar.calendars',
         'https://www.googleapis.com/auth/contacts.readonly',
         'https://www.googleapis.com/auth/contacts.other.readonly',
       ],

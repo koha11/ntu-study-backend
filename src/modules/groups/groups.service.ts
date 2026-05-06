@@ -117,6 +117,23 @@ export class GroupsService {
       }
     }
 
+    if (leader) {
+      const calendarAccess =
+        await this.googleAccessTokenService.resolveGoogleAccessToken(leader);
+      if (calendarAccess) {
+        const calendarId =
+          await this.googleCalendarService.createSecondaryCalendar(
+            calendarAccess,
+            name,
+            'Shared calendar for this NTU Study group.',
+          );
+        if (calendarId) {
+          saved.google_calendar_id = calendarId;
+          await this.groupsRepository.save(saved);
+        }
+      }
+    }
+
     return saved;
   }
 
