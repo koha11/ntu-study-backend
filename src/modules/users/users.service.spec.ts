@@ -102,6 +102,7 @@ describe('UsersService', () => {
           'quota_last_updated',
           'is_active',
           'notification_enabled',
+          'preferred_language',
           'last_login_at',
           'canva_access_token',
           'canva_refresh_token',

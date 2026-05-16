@@ -4,9 +4,11 @@ import {
   IsString,
   IsOptional,
   IsBoolean,
+  IsEnum,
   Matches,
   ValidateIf,
 } from 'class-validator';
+import { Language } from '@common/enums';
 
 export class CreateUserDto {
   @IsEmail()
@@ -41,4 +43,8 @@ export class UpdateUserDto {
     message: 'drive_total_quota must be a non-negative integer string',
   })
   drive_total_quota?: string | null;
+
+  @IsOptional()
+  @IsEnum(Language)
+  preferred_language?: Language;
 }

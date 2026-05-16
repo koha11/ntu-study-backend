@@ -34,6 +34,7 @@ function toProfileResponse(user: User) {
     avatar_url: user.avatar_url ?? null,
     role: user.role,
     notification_enabled: user.notification_enabled,
+    preferred_language: user.preferred_language,
     canva_connected: canvaConnected(user),
     drive_total_quota:
       user.drive_total_quota != null ? String(user.drive_total_quota) : null,
@@ -107,6 +108,9 @@ export class UsersController {
         updateUserDto.drive_total_quota === null
           ? (null as unknown as number)
           : (updateUserDto.drive_total_quota as unknown as number);
+    }
+    if (updateUserDto.preferred_language !== undefined) {
+      patch.preferred_language = updateUserDto.preferred_language;
     }
 
     if (Object.keys(patch).length > 0) {

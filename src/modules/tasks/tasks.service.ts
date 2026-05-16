@@ -392,10 +392,14 @@ export class TasksService {
       return;
     }
     const taskUrl = this.groupTasksUrl(group.id);
+    const assigneeLang = assignee.preferred_language;
+    const assigneeVi = assigneeLang !== 'en';
     await this.notificationsService.createNotification({
       recipient_id: assignee.id,
       type: NOTIFICATION_TYPE.TASK_ASSIGNED,
-      message: `You were assigned "${task.title}" in ${group.name}`,
+      message: assigneeVi
+        ? `Bạn được giao "${task.title}" trong ${group.name}`
+        : `You were assigned "${task.title}" in ${group.name}`,
       related_entity_type: RELATED_ENTITY_TYPE.TASK,
       related_entity_id: task.id,
     });
@@ -410,6 +414,7 @@ export class TasksService {
         groupName: group.name,
         taskUrl,
         threadMessageId: thread?.thread_message_id,
+        lang: assigneeLang,
       });
     }
   }
@@ -434,10 +439,14 @@ export class TasksService {
     const submitter = await this.usersService.findOne(submitterUserId);
     const submitterName = submitter?.full_name ?? 'Someone';
     const taskUrl = this.groupTasksUrl(group.id);
+    const leaderLang = leader.preferred_language;
+    const leaderVi = leaderLang !== 'en';
     await this.notificationsService.createNotification({
       recipient_id: leader.id,
       type: NOTIFICATION_TYPE.TASK_PENDING_REVIEW,
-      message: `${submitterName} submitted "${task.title}" in ${group.name} for review`,
+      message: leaderVi
+        ? `${submitterName} đã nộp "${task.title}" trong ${group.name} để duyệt`
+        : `${submitterName} submitted "${task.title}" in ${group.name} for review`,
       related_entity_type: RELATED_ENTITY_TYPE.TASK,
       related_entity_id: task.id,
     });
@@ -453,6 +462,7 @@ export class TasksService {
         submitterName,
         taskUrl,
         threadMessageId: thread?.thread_message_id,
+        lang: leaderLang,
       });
     }
   }
@@ -471,14 +481,28 @@ export class TasksService {
       return;
     }
     const outcome = status === TaskStatus.DONE ? 'done' : 'failed';
-    const label = outcome === 'done' ? 'approved (Done)' : 'marked as Failed';
+    const assigneeLang2 = assignee.preferred_language;
+    const assigneeVi2 = assigneeLang2 !== 'en';
+    const label = assigneeVi2
+      ? outcome === 'done'
+        ? 'được duyệt (Hoàn thành)'
+        : 'bị đánh dấu Thất bại'
+      : outcome === 'done'
+        ? 'approved (Done)'
+        : 'marked as Failed';
     const rejectionReason =
-      status === TaskStatus.FAILED && comment ? ` Reason: ${comment}` : '';
+      status === TaskStatus.FAILED && comment
+        ? assigneeVi2
+          ? ` Lý do: ${comment}`
+          : ` Reason: ${comment}`
+        : '';
     const taskUrl = this.groupTasksUrl(group.id);
     await this.notificationsService.createNotification({
       recipient_id: assignee.id,
       type: NOTIFICATION_TYPE.TASK_REVIEW_RESULT,
-      message: `Your task "${task.title}" in ${group.name} was ${label}.${rejectionReason}`,
+      message: assigneeVi2
+        ? `Nhiệm vụ "${task.title}" của bạn trong ${group.name} đã ${label}.${rejectionReason}`
+        : `Your task "${task.title}" in ${group.name} was ${label}.${rejectionReason}`,
       related_entity_type: RELATED_ENTITY_TYPE.TASK,
       related_entity_id: task.id,
     });
@@ -495,6 +519,7 @@ export class TasksService {
         comment: status === TaskStatus.FAILED ? comment : undefined,
         taskUrl,
         threadMessageId: thread?.thread_message_id,
+        lang: assigneeLang2,
       });
     }
   }

@@ -1,3 +1,4 @@
+export * from './language.enum';
 export * from './user-role.enum';
 export * from './group-status.enum';
 export * from './invitation-status.enum';

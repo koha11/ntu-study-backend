@@ -169,12 +169,18 @@ export class InvitationsService {
     group: Group,
     inviteeId: string,
   ): Promise<void> {
-    const inviter = await this.usersService.findOne(saved.invited_by_id);
+    const [inviter, invitee] = await Promise.all([
+      this.usersService.findOne(saved.invited_by_id),
+      this.usersService.findOne(inviteeId),
+    ]);
     const inviterName = inviter?.full_name ?? 'Someone';
+    const vi = invitee?.preferred_language !== 'en';
     await this.notificationsService.createNotification({
       recipient_id: inviteeId,
       type: NOTIFICATION_TYPE.GROUP_INVITATION,
-      message: `${inviterName} invited you to join ${group.name}`,
+      message: vi
+        ? `${inviterName} đã mời bạn tham gia ${group.name}`
+        : `${inviterName} invited you to join ${group.name}`,
       related_entity_type: RELATED_ENTITY_TYPE.GROUP_INVITATION,
       related_entity_id: saved.id,
     });
@@ -186,7 +192,12 @@ export class InvitationsService {
     normalizedEmail: string,
     existingInviteeId?: string,
   ): Promise<void> {
-    const inviter = await this.usersService.findOne(saved.invited_by_id);
+    const [inviter, invitee] = await Promise.all([
+      this.usersService.findOne(saved.invited_by_id),
+      existingInviteeId
+        ? this.usersService.findOne(existingInviteeId)
+        : Promise.resolve(null),
+    ]);
     const baseUrl =
       this.configService.get<string>('FRONTEND_URL')?.replace(/\/$/, '') ||
       'http://localhost:5173';
@@ -198,6 +209,8 @@ export class InvitationsService {
         inviter.full_name,
         group.name,
         invitationLink,
+        undefined,
+        invitee?.preferred_language,
       );
       if (messageId && existingInviteeId) {
         await this.groupEmailThreadService.create(

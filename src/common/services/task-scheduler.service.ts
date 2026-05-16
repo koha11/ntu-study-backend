@@ -120,14 +120,23 @@ export class TaskSchedulerService {
 
       for (const [groupKey, tasks] of byGroup.entries()) {
         // Always create in-app notifications regardless of email preference
+        const userVi = user.preferred_language !== 'en';
         for (const task of tasks) {
           const notification = new Notification();
           notification.recipient = user;
           notification.recipient_id = user.id;
           notification.type = 'Task Overdue';
-          notification.message = `Your task "${task.title}" is overdue${
-            task.due_date ? ` (due ${task.due_date.toLocaleDateString()})` : ''
-          }`;
+          notification.message = userVi
+            ? `Nhiệm vụ "${task.title}" của bạn đã quá hạn${
+                task.due_date
+                  ? ` (hạn ${task.due_date.toLocaleDateString()})`
+                  : ''
+              }`
+            : `Your task "${task.title}" is overdue${
+                task.due_date
+                  ? ` (due ${task.due_date.toLocaleDateString()})`
+                  : ''
+              }`;
           notification.is_read = false;
           notification.delivery_channel = NotificationDeliveryChannel.WEB;
           await this.notificationsRepository.save(notification);
@@ -144,9 +153,10 @@ export class TaskSchedulerService {
           // Personal tasks: send one batched email with no threading
           await this.emailService.sendBatchedTaskReminderEmail({
             toEmail: user.email,
-            groupName: 'Personal Tasks',
+            groupName: userVi ? 'Nhiệm vụ cá nhân' : 'Personal Tasks',
             tasks: taskItems,
             groupUrl: `${base}/tasks`,
+            lang: user.preferred_language,
           });
         } else {
           const groupName = tasks[0].group?.name ?? groupKey;
@@ -160,6 +170,7 @@ export class TaskSchedulerService {
             tasks: taskItems,
             groupUrl: `${base}/groups/${groupKey}`,
             threadMessageId: thread?.thread_message_id,
+            lang: user.preferred_language,
           });
         }
       }

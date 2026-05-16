@@ -193,6 +193,7 @@ describe('TasksController', () => {
       'tid',
       userId,
       TaskStatus.DONE,
+      undefined,
     );
   });
 

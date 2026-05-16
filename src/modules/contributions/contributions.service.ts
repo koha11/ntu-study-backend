@@ -254,6 +254,7 @@ export class ContributionsService {
         dueDate,
         groupUrl,
         threadMessageId: thread?.thread_message_id,
+        lang: user.preferred_language,
       });
     }
   }

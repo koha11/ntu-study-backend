@@ -7,7 +7,7 @@ import {
   JoinTable,
   Index,
 } from 'typeorm';
-import { UserRole } from '@common/enums';
+import { Language, UserRole } from '@common/enums';
 import { BaseEntity } from '@common/entities/base.entity';
 import { Group } from '@modules/groups/entities/group.entity';
 import { GroupMember } from '@modules/groups/entities/group-member.entity';
@@ -60,6 +60,9 @@ export class User extends BaseEntity {
 
   @Column({ type: 'boolean', default: true })
   notification_enabled!: boolean;
+
+  @Column({ type: 'enum', enum: Language, default: Language.VI })
+  preferred_language!: Language;
 
   @Column({ type: 'timestamptz', nullable: true })
   last_login_at?: Date;

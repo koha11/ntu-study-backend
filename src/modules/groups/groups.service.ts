@@ -149,6 +149,7 @@ export class GroupsService {
         leaderName: leader.full_name,
         groupName: name,
         groupUrl: `${base}/groups/${saved.id}`,
+        lang: leader.preferred_language,
       });
       if (messageId) {
         await this.groupEmailThreadService.create(saved.id, leaderId, messageId);

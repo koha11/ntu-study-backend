@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
+import { Language } from '@common/enums';
 
 export interface EmailOptions {
   to: string | string[];
@@ -115,19 +116,32 @@ export class EmailService {
     groupName: string;
     groupUrl: string;
     threadMessageId?: string;
+    lang?: Language;
   }): Promise<string | null> {
-    const { toEmail, leaderName, groupName, groupUrl, threadMessageId } =
+    const { toEmail, leaderName, groupName, groupUrl, threadMessageId, lang } =
       params;
+    const vi = lang !== Language.EN;
     return this.send({
       to: toEmail,
-      subject: `Your group "${groupName}" has been created`,
-      html: `
+      subject: vi
+        ? `Nhóm "${groupName}" của bạn đã được tạo`
+        : `Your group "${groupName}" has been created`,
+      html: vi
+        ? `
+        <h2>Tạo nhóm thành công</h2>
+        <p>Xin chào ${leaderName},</p>
+        <p>Nhóm học tập <strong>${groupName}</strong> của bạn đã được tạo. Bạn có thể bắt đầu mời thành viên ngay bây giờ.</p>
+        <p><a href="${groupUrl}">Mở nhóm của bạn</a></p>
+      `
+        : `
         <h2>Group Created Successfully</h2>
         <p>Hi ${leaderName},</p>
         <p>Your study group <strong>${groupName}</strong> has been created. You can start inviting members now.</p>
         <p><a href="${groupUrl}">Open your group</a></p>
       `,
-      text: `Hi ${leaderName}, your group "${groupName}" has been created.\n${groupUrl}`,
+      text: vi
+        ? `Xin chào ${leaderName}, nhóm "${groupName}" của bạn đã được tạo.\n${groupUrl}`
+        : `Hi ${leaderName}, your group "${groupName}" has been created.\n${groupUrl}`,
       inReplyTo: threadMessageId,
     });
   }
@@ -138,16 +152,28 @@ export class EmailService {
     groupName: string,
     invitationLink: string,
     threadMessageId?: string,
+    lang?: Language,
   ): Promise<string | null> {
+    const vi = lang !== Language.EN;
     return this.send({
       to: userEmail,
-      subject: `You're invited to join ${groupName}`,
-      html: `
+      subject: vi
+        ? `Bạn được mời tham gia ${groupName}`
+        : `You're invited to join ${groupName}`,
+      html: vi
+        ? `
+        <h2>Lời mời tham gia nhóm</h2>
+        <p>${inviterName} đã mời bạn tham gia nhóm học tập <strong>${groupName}</strong>.</p>
+        <p><a href="${invitationLink}">Chấp nhận lời mời</a></p>
+      `
+        : `
         <h2>Group Invitation</h2>
         <p>${inviterName} has invited you to join the study group <strong>${groupName}</strong>.</p>
         <p><a href="${invitationLink}">Accept Invitation</a></p>
       `,
-      text: `You're invited to join ${groupName}.\nAccept here: ${invitationLink}`,
+      text: vi
+        ? `Bạn được mời tham gia ${groupName}.\nChấp nhận tại đây: ${invitationLink}`
+        : `You're invited to join ${groupName}.\nAccept here: ${invitationLink}`,
       inReplyTo: threadMessageId,
     });
   }
@@ -174,17 +200,30 @@ export class EmailService {
     groupName: string;
     taskUrl: string;
     threadMessageId?: string;
+    lang?: Language;
   }): Promise<string | null> {
-    const { toEmail, taskTitle, groupName, taskUrl, threadMessageId } = params;
+    const { toEmail, taskTitle, groupName, taskUrl, threadMessageId, lang } =
+      params;
+    const vi = lang !== Language.EN;
     return this.send({
       to: toEmail,
-      subject: `New task assigned: ${taskTitle}`,
-      html: `
+      subject: vi
+        ? `Nhiệm vụ mới được giao: ${taskTitle}`
+        : `New task assigned: ${taskTitle}`,
+      html: vi
+        ? `
+        <h2>Bạn được giao nhiệm vụ</h2>
+        <p>Bạn đã được giao <strong>${taskTitle}</strong> trong nhóm <strong>${groupName}</strong>.</p>
+        <p><a href="${taskUrl}">Xem nhiệm vụ nhóm</a></p>
+      `
+        : `
         <h2>You were assigned a task</h2>
         <p>You have been assigned <strong>${taskTitle}</strong> in <strong>${groupName}</strong>.</p>
         <p><a href="${taskUrl}">Open group tasks</a></p>
       `,
-      text: `You were assigned "${taskTitle}" in ${groupName}.\n${taskUrl}`,
+      text: vi
+        ? `Bạn được giao "${taskTitle}" trong ${groupName}.\n${taskUrl}`
+        : `You were assigned "${taskTitle}" in ${groupName}.\n${taskUrl}`,
       inReplyTo: threadMessageId,
     });
   }
@@ -196,6 +235,7 @@ export class EmailService {
     submitterName: string;
     taskUrl: string;
     threadMessageId?: string;
+    lang?: Language;
   }): Promise<string | null> {
     const {
       toEmail,
@@ -204,16 +244,28 @@ export class EmailService {
       submitterName,
       taskUrl,
       threadMessageId,
+      lang,
     } = params;
+    const vi = lang !== Language.EN;
     return this.send({
       to: toEmail,
-      subject: `Task ready for review: ${taskTitle}`,
-      html: `
+      subject: vi
+        ? `Nhiệm vụ chờ duyệt: ${taskTitle}`
+        : `Task ready for review: ${taskTitle}`,
+      html: vi
+        ? `
+        <h2>Nhiệm vụ đã được nộp để duyệt</h2>
+        <p><strong>${submitterName}</strong> đã nộp <strong>${taskTitle}</strong> trong nhóm <strong>${groupName}</strong> để bạn duyệt.</p>
+        <p><a href="${taskUrl}">Xem nhiệm vụ nhóm</a></p>
+      `
+        : `
         <h2>Task submitted for review</h2>
         <p><strong>${submitterName}</strong> submitted <strong>${taskTitle}</strong> in <strong>${groupName}</strong> for your review.</p>
         <p><a href="${taskUrl}">Open group tasks</a></p>
       `,
-      text: `${submitterName} submitted "${taskTitle}" in ${groupName} for review.\n${taskUrl}`,
+      text: vi
+        ? `${submitterName} đã nộp "${taskTitle}" trong ${groupName} để duyệt.\n${taskUrl}`
+        : `${submitterName} submitted "${taskTitle}" in ${groupName} for review.\n${taskUrl}`,
       inReplyTo: threadMessageId,
     });
   }
@@ -226,6 +278,7 @@ export class EmailService {
     comment?: string;
     taskUrl: string;
     threadMessageId?: string;
+    lang?: Language;
   }): Promise<string | null> {
     const {
       toEmail,
@@ -235,24 +288,45 @@ export class EmailService {
       comment,
       taskUrl,
       threadMessageId,
+      lang,
     } = params;
-    const label = outcome === 'done' ? 'approved (Done)' : 'marked as Failed';
+    const vi = lang !== Language.EN;
+    const label = vi
+      ? outcome === 'done'
+        ? 'được duyệt (Hoàn thành)'
+        : 'bị đánh dấu Thất bại'
+      : outcome === 'done'
+        ? 'approved (Done)'
+        : 'marked as Failed';
     const commentHtml =
       outcome === 'failed' && comment
-        ? `<p><strong>Reason:</strong> ${comment}</p>`
+        ? `<p><strong>${vi ? 'Lý do' : 'Reason'}:</strong> ${comment}</p>`
         : '';
     const commentText =
-      outcome === 'failed' && comment ? `\nReason: ${comment}` : '';
+      outcome === 'failed' && comment
+        ? `\n${vi ? 'Lý do' : 'Reason'}: ${comment}`
+        : '';
     return this.send({
       to: toEmail,
-      subject: `Task ${outcome === 'done' ? 'approved' : 'update'}: ${taskTitle}`,
-      html: `
+      subject: vi
+        ? `Nhiệm vụ ${outcome === 'done' ? 'được duyệt' : 'cập nhật'}: ${taskTitle}`
+        : `Task ${outcome === 'done' ? 'approved' : 'update'}: ${taskTitle}`,
+      html: vi
+        ? `
+        <h2>Nhiệm vụ ${label}</h2>
+        <p>Nhiệm vụ <strong>${taskTitle}</strong> của bạn trong nhóm <strong>${groupName}</strong> đã ${label}.</p>
+        ${commentHtml}
+        <p><a href="${taskUrl}">Xem nhiệm vụ nhóm</a></p>
+      `
+        : `
         <h2>Task ${label}</h2>
         <p>Your task <strong>${taskTitle}</strong> in <strong>${groupName}</strong> was ${label}.</p>
         ${commentHtml}
         <p><a href="${taskUrl}">Open group tasks</a></p>
       `,
-      text: `Your task "${taskTitle}" in ${groupName} was ${label}.${commentText}\n${taskUrl}`,
+      text: vi
+        ? `Nhiệm vụ "${taskTitle}" của bạn trong ${groupName} đã ${label}.${commentText}\n${taskUrl}`
+        : `Your task "${taskTitle}" in ${groupName} was ${label}.${commentText}\n${taskUrl}`,
       inReplyTo: threadMessageId,
     });
   }
@@ -263,18 +337,32 @@ export class EmailService {
     dueDate: Date;
     groupUrl: string;
     threadMessageId?: string;
+    lang?: Language;
   }): Promise<string | null> {
-    const { toEmail, groupName, dueDate, groupUrl, threadMessageId } = params;
+    const { toEmail, groupName, dueDate, groupUrl, threadMessageId, lang } =
+      params;
+    const vi = lang !== Language.EN;
     return this.send({
       to: toEmail,
-      subject: `Peer evaluation is open: ${groupName}`,
-      html: `
+      subject: vi
+        ? `Đánh giá đóng góp đã mở: ${groupName}`
+        : `Peer evaluation is open: ${groupName}`,
+      html: vi
+        ? `
+        <h2>Vòng đánh giá đồng nghiệp đã bắt đầu</h2>
+        <p>Một vòng đánh giá đồng nghiệp mới đã bắt đầu cho nhóm <strong>${groupName}</strong> của bạn.</p>
+        <p>Vui lòng đánh giá đóng góp của đồng đội trước <strong>${dueDate.toLocaleDateString()}</strong>.</p>
+        <p><a href="${groupUrl}">Đến nhóm</a></p>
+      `
+        : `
         <h2>Peer Evaluation Round Opened</h2>
         <p>A new peer evaluation round has started for your group <strong>${groupName}</strong>.</p>
         <p>Please rate your teammates' contributions before <strong>${dueDate.toLocaleDateString()}</strong>.</p>
         <p><a href="${groupUrl}">Go to group</a></p>
       `,
-      text: `Peer evaluation is open for ${groupName}. Rate by ${dueDate.toLocaleDateString()}.\n${groupUrl}`,
+      text: vi
+        ? `Đánh giá đóng góp đã mở cho ${groupName}. Đánh giá trước ${dueDate.toLocaleDateString()}.\n${groupUrl}`
+        : `Peer evaluation is open for ${groupName}. Rate by ${dueDate.toLocaleDateString()}.\n${groupUrl}`,
       inReplyTo: threadMessageId,
     });
   }
@@ -289,28 +377,50 @@ export class EmailService {
     tasks: { title: string; dueDate: Date }[];
     groupUrl: string;
     threadMessageId?: string;
+    lang?: Language;
   }): Promise<string | null> {
-    const { toEmail, groupName, tasks, groupUrl, threadMessageId } = params;
+    const { toEmail, groupName, tasks, groupUrl, threadMessageId, lang } =
+      params;
+    const vi = lang !== Language.EN;
     const taskRows = tasks
       .map(
         (t) =>
-          `<li><strong>${t.title}</strong> — due ${t.dueDate.toLocaleString()}</li>`,
+          vi
+            ? `<li><strong>${t.title}</strong> — hạn ${t.dueDate.toLocaleString()}</li>`
+            : `<li><strong>${t.title}</strong> — due ${t.dueDate.toLocaleString()}</li>`,
       )
       .join('');
     return this.send({
       to: toEmail,
-      subject: `Overdue task reminder: ${groupName}`,
-      html: `
+      subject: vi
+        ? `Nhắc nhở nhiệm vụ quá hạn: ${groupName}`
+        : `Overdue task reminder: ${groupName}`,
+      html: vi
+        ? `
+        <h2>Nhiệm vụ quá hạn — ${groupName}</h2>
+        <p>Các nhiệm vụ sau đây đã quá hạn:</p>
+        <ul>${taskRows}</ul>
+        <p>Vui lòng hoàn thành sớm nhất có thể.</p>
+        <p><a href="${groupUrl}">Xem nhiệm vụ nhóm</a></p>
+      `
+        : `
         <h2>Overdue Tasks — ${groupName}</h2>
         <p>The following tasks are overdue:</p>
         <ul>${taskRows}</ul>
         <p>Please complete them as soon as possible.</p>
         <p><a href="${groupUrl}">Open group tasks</a></p>
       `,
-      text:
-        `Overdue tasks in ${groupName}:\n` +
-        tasks.map((t) => `- ${t.title} (due ${t.dueDate.toLocaleString()})`).join('\n') +
-        `\n${groupUrl}`,
+      text: vi
+        ? `Nhiệm vụ quá hạn trong ${groupName}:\n` +
+          tasks
+            .map((t) => `- ${t.title} (hạn ${t.dueDate.toLocaleString()})`)
+            .join('\n') +
+          `\n${groupUrl}`
+        : `Overdue tasks in ${groupName}:\n` +
+          tasks
+            .map((t) => `- ${t.title} (due ${t.dueDate.toLocaleString()})`)
+            .join('\n') +
+          `\n${groupUrl}`,
       inReplyTo: threadMessageId,
     });
   }
