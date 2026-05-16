@@ -223,21 +223,36 @@ export class EmailService {
     taskTitle: string;
     groupName: string;
     outcome: 'done' | 'failed';
+    comment?: string;
     taskUrl: string;
     threadMessageId?: string;
   }): Promise<string | null> {
-    const { toEmail, taskTitle, groupName, outcome, taskUrl, threadMessageId } =
-      params;
+    const {
+      toEmail,
+      taskTitle,
+      groupName,
+      outcome,
+      comment,
+      taskUrl,
+      threadMessageId,
+    } = params;
     const label = outcome === 'done' ? 'approved (Done)' : 'marked as Failed';
+    const commentHtml =
+      outcome === 'failed' && comment
+        ? `<p><strong>Reason:</strong> ${comment}</p>`
+        : '';
+    const commentText =
+      outcome === 'failed' && comment ? `\nReason: ${comment}` : '';
     return this.send({
       to: toEmail,
       subject: `Task ${outcome === 'done' ? 'approved' : 'update'}: ${taskTitle}`,
       html: `
         <h2>Task ${label}</h2>
         <p>Your task <strong>${taskTitle}</strong> in <strong>${groupName}</strong> was ${label}.</p>
+        ${commentHtml}
         <p><a href="${taskUrl}">Open group tasks</a></p>
       `,
-      text: `Your task "${taskTitle}" in ${groupName} was ${label}.\n${taskUrl}`,
+      text: `Your task "${taskTitle}" in ${groupName} was ${label}.${commentText}\n${taskUrl}`,
       inReplyTo: threadMessageId,
     });
   }

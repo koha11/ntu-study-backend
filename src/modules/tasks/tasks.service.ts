@@ -248,6 +248,7 @@ export class TasksService {
     id: string,
     leaderId: string,
     status: TaskStatus,
+    comment?: string,
   ): Promise<Task> {
     if (status !== TaskStatus.DONE && status !== TaskStatus.FAILED) {
       throw new BadRequestException('Approval status must be done or failed');
@@ -278,7 +279,7 @@ export class TasksService {
     task.reviewed_by_id = leaderId;
     await this.tasksRepository.save(task);
     const reloaded = await this.reloadTaskWithRelations(id);
-    await this.maybeNotifyAssigneeReviewResult(reloaded, group, status);
+    await this.maybeNotifyAssigneeReviewResult(reloaded, group, status, comment);
     return reloaded;
   }
 
@@ -460,6 +461,7 @@ export class TasksService {
     task: Task,
     group: Group,
     status: TaskStatus,
+    comment?: string,
   ): Promise<void> {
     if (!task.assignee_id) {
       return;
@@ -470,11 +472,13 @@ export class TasksService {
     }
     const outcome = status === TaskStatus.DONE ? 'done' : 'failed';
     const label = outcome === 'done' ? 'approved (Done)' : 'marked as Failed';
+    const rejectionReason =
+      status === TaskStatus.FAILED && comment ? ` Reason: ${comment}` : '';
     const taskUrl = this.groupTasksUrl(group.id);
     await this.notificationsService.createNotification({
       recipient_id: assignee.id,
       type: NOTIFICATION_TYPE.TASK_REVIEW_RESULT,
-      message: `Your task "${task.title}" in ${group.name} was ${label}`,
+      message: `Your task "${task.title}" in ${group.name} was ${label}.${rejectionReason}`,
       related_entity_type: RELATED_ENTITY_TYPE.TASK,
       related_entity_id: task.id,
     });
@@ -488,6 +492,7 @@ export class TasksService {
         taskTitle: task.title,
         groupName: group.name,
         outcome,
+        comment: status === TaskStatus.FAILED ? comment : undefined,
         taskUrl,
         threadMessageId: thread?.thread_message_id,
       });

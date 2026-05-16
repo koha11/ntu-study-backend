@@ -159,7 +159,7 @@ export class TasksController {
   ) {
     const user = req.user as JwtRequestUser;
     return this.tasksService
-      .approveTask(id, user.id, approveTaskDto.status)
+      .approveTask(id, user.id, approveTaskDto.status, approveTaskDto.comment)
       .then(serializeTaskForApi);
   }
 
