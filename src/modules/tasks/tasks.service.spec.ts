@@ -15,6 +15,7 @@ import { TaskStatus } from '@common/enums';
 import { NotificationsService } from '@modules/notifications/notifications.service';
 import { UsersService } from '@modules/users/users.service';
 import { EmailService } from '@common/services/email.service';
+import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 import { NOTIFICATION_TYPE } from '@common/constants/notification-types';
 
 describe('TasksService', () => {
@@ -41,6 +42,7 @@ describe('TasksService', () => {
     sendTaskReviewResultEmail: ReturnType<typeof vi.fn>;
   };
   let configService: { get: ReturnType<typeof vi.fn> };
+  let groupEmailThreadService: { findByGroupAndUser: ReturnType<typeof vi.fn> };
 
   const userId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   const otherUserId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -99,6 +101,10 @@ describe('TasksService', () => {
       get: vi.fn().mockReturnValue('http://frontend.test'),
     };
 
+    groupEmailThreadService = {
+      findByGroupAndUser: vi.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TasksService,
@@ -112,6 +118,7 @@ describe('TasksService', () => {
         { provide: UsersService, useValue: usersService },
         { provide: EmailService, useValue: emailService },
         { provide: ConfigService, useValue: configService },
+        { provide: GroupEmailThreadService, useValue: groupEmailThreadService },
       ],
     }).compile();
 
@@ -341,7 +348,9 @@ describe('TasksService', () => {
         id: groupId,
         leader_id: userId,
       });
-      tasksRepository.find.mockResolvedValue([{ id: taskId, group_id: groupId }]);
+      tasksRepository.find.mockResolvedValue([
+        { id: taskId, group_id: groupId },
+      ]);
 
       const list = await service.findGroupTasks(groupId, userId);
 

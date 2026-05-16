@@ -15,15 +15,13 @@ describe('AdminGuard', () => {
   const guard = new AdminGuard();
 
   it('allows when role is admin', () => {
-    expect(
-      guard.canActivate(mockCtx({ role: UserRole.ADMIN })),
-    ).toBe(true);
+    expect(guard.canActivate(mockCtx({ role: UserRole.ADMIN }))).toBe(true);
   });
 
   it('throws when role is not admin', () => {
-    expect(() =>
-      guard.canActivate(mockCtx({ role: UserRole.USER })),
-    ).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(mockCtx({ role: UserRole.USER }))).toThrow(
+      ForbiddenException,
+    );
   });
 
   it('throws when user missing', () => {

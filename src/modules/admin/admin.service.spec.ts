@@ -78,9 +78,7 @@ describe('AdminService', () => {
       addSelect: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       groupBy: vi.fn().mockReturnThis(),
-      getRawMany: vi
-        .fn()
-        .mockResolvedValue([{ group_id: 'g1', cnt: '2' }]),
+      getRawMany: vi.fn().mockResolvedValue([{ group_id: 'g1', cnt: '2' }]),
     };
     groupMembersRepo = {
       createQueryBuilder: vi.fn().mockReturnValue(qbGm),
@@ -125,7 +123,10 @@ describe('AdminService', () => {
         AdminService,
         { provide: getRepositoryToken(User), useValue: usersRepo },
         { provide: getRepositoryToken(Group), useValue: groupsRepo },
-        { provide: getRepositoryToken(GroupMember), useValue: groupMembersRepo },
+        {
+          provide: getRepositoryToken(GroupMember),
+          useValue: groupMembersRepo,
+        },
         { provide: getRepositoryToken(Task), useValue: tasksRepo },
         { provide: getRepositoryToken(CronJobRun), useValue: cronRepo },
       ],

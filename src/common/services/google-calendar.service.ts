@@ -82,9 +82,7 @@ export class GoogleCalendarService {
       const { data } = await calendar.calendars.insert({
         requestBody: {
           summary: title,
-          ...(description?.trim()
-            ? { description: description.trim() }
-            : {}),
+          ...(description?.trim() ? { description: description.trim() } : {}),
         },
       });
       const id = data.id?.trim();
@@ -124,7 +122,8 @@ export class GoogleCalendarService {
     const meet_link =
       ev.hangoutLink?.trim() ||
       meetFromConference ||
-      (typeof ev.location === 'string' && ev.location.includes('meet.google.com')
+      (typeof ev.location === 'string' &&
+      ev.location.includes('meet.google.com')
         ? ev.location
         : null);
 
@@ -235,7 +234,9 @@ export class GoogleCalendarService {
     } else if (mode === 'online' && params.online_option === 'one_time_meet') {
       meet_link = this.extractMeetLink(data);
       if (!meet_link) {
-        this.logger.error('Calendar event created but no Meet link in response');
+        this.logger.error(
+          'Calendar event created but no Meet link in response',
+        );
         throw new Error(
           'Could not create a Google Meet link. Try signing out and signing in again to grant Calendar access.',
         );
@@ -301,12 +302,17 @@ export class GoogleCalendarService {
     };
   }
 
-  private extractMeetLink(data: calendar_v3.Schema$Event | null | undefined): string | null {
+  private extractMeetLink(
+    data: calendar_v3.Schema$Event | null | undefined,
+  ): string | null {
     if (!data?.conferenceData?.entryPoints) {
       return null;
     }
     for (const ep of data.conferenceData.entryPoints) {
-      if (ep.entryPointType === 'video' && ep.uri?.includes('meet.google.com')) {
+      if (
+        ep.entryPointType === 'video' &&
+        ep.uri?.includes('meet.google.com')
+      ) {
         return ep.uri;
       }
     }

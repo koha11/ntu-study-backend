@@ -5,9 +5,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * That index blocks opening a second evaluation round for the same member pairs.
  * TypeORM synchronize or an older schema may have created "UQ_8676bae96596134387cf1f42a5b".
  */
-export class DropStaleContributionRatingUnique1746300000000
-  implements MigrationInterface
-{
+export class DropStaleContributionRatingUnique1746300000000 implements MigrationInterface {
   name = 'DropStaleContributionRatingUnique1746300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

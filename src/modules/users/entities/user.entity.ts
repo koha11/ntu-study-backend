@@ -99,9 +99,6 @@ export class User extends BaseEntity {
   @OneToMany(() => ContributionRating, (rating) => rating.rater)
   ratings_given!: ContributionRating[];
 
-  @OneToMany(() => ContributionRating, (rating) => rating.ratee)
-  ratings_received!: ContributionRating[];
-
   @OneToMany(() => FlashcardSet, (set) => set.owner)
   flashcard_sets!: FlashcardSet[];
 

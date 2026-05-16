@@ -22,7 +22,8 @@ export class GoogleAccessTokenService {
     const expiryMs = user.token_expires_at?.getTime() ?? 0;
     const accessLooksFresh =
       !!user.google_access_token &&
-      (!user.token_expires_at || expiryMs > now + GOOGLE_TOKEN_EXPIRY_BUFFER_MS);
+      (!user.token_expires_at ||
+        expiryMs > now + GOOGLE_TOKEN_EXPIRY_BUFFER_MS);
 
     if (accessLooksFresh) {
       return user.google_access_token!;

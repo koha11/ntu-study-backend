@@ -94,11 +94,10 @@ describe('FlashcardsController', () => {
   it('addFlashcard forwards ids and dto', async () => {
     flashcardsService.addFlashcard.mockResolvedValue({ id: cardId });
 
-    await controller.addFlashcard(
-      { user: { id: userId } } as never,
-      setId,
-      { front: 'Q', back: 'A' } as never,
-    );
+    await controller.addFlashcard({ user: { id: userId } } as never, setId, {
+      front: 'Q',
+      back: 'A',
+    } as never);
 
     expect(flashcardsService.addFlashcard).toHaveBeenCalledWith(userId, setId, {
       front: 'Q',
@@ -140,11 +139,9 @@ describe('FlashcardsController', () => {
       score: 75,
     });
 
-    await controller.completeStudy(
-      { user: { id: userId } } as never,
-      setId,
-      { score: 75 } as never,
-    );
+    await controller.completeStudy({ user: { id: userId } } as never, setId, {
+      score: 75,
+    } as never);
 
     expect(flashcardsService.completeStudy).toHaveBeenCalledWith(
       userId,

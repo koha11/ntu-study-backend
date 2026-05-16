@@ -113,7 +113,10 @@ export class AuthController {
     description: 'New JWT token issued',
     type: LoginResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Missing or invalid refresh_token body' })
+  @ApiResponse({
+    status: 400,
+    description: 'Missing or invalid refresh_token body',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async refreshToken(@Body() body: RefreshTokenDto): Promise<LoginResponseDto> {
     const { refresh_token } = body;

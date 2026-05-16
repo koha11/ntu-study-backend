@@ -3,7 +3,9 @@ import type { FlashcardSet } from './entities/flashcard-set.entity';
 import type { FlashcardStudyLog } from './entities/flashcard-study-log.entity';
 import type { FlashcardSetListRow } from './flashcards.service';
 
-export function serializeFlashcardForApi(card: Flashcard): Record<string, unknown> {
+export function serializeFlashcardForApi(
+  card: Flashcard,
+): Record<string, unknown> {
   return {
     id: card.id,
     created_at: card.created_at,
@@ -36,7 +38,9 @@ export function serializeFlashcardSetForApi(
   return base;
 }
 
-export function serializeStudyLogForApi(log: FlashcardStudyLog): Record<string, unknown> {
+export function serializeStudyLogForApi(
+  log: FlashcardStudyLog,
+): Record<string, unknown> {
   return {
     id: log.id,
     created_at: log.created_at,

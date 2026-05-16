@@ -33,10 +33,14 @@ export class CronJobRuns1746600000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "public"."IDX_cron_job_runs_started_at"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_cron_job_runs_started_at"`,
+    );
     await queryRunner.query(`DROP INDEX "public"."IDX_cron_job_runs_job_name"`);
     await queryRunner.query(`DROP TABLE "cron_job_runs"`);
-    await queryRunner.query(`DROP TYPE "public"."cron_job_runs_triggered_by_enum"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."cron_job_runs_triggered_by_enum"`,
+    );
     await queryRunner.query(`DROP TYPE "public"."cron_job_runs_status_enum"`);
   }
 }

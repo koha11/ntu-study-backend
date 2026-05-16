@@ -5,7 +5,10 @@ import { NotFoundException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { Notification } from './entities/notification.entity';
 import { NotificationDeliveryChannel } from '@common/enums';
-import { NOTIFICATION_TYPE, RELATED_ENTITY_TYPE } from '@common/constants/notification-types';
+import {
+  NOTIFICATION_TYPE,
+  RELATED_ENTITY_TYPE,
+} from '@common/constants/notification-types';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;

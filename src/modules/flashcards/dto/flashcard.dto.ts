@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  IsUUID,
+  Min,
+  Max,
+} from 'class-validator';
 
 export class CreateFlashcardSetDto {
   @IsString()
@@ -53,4 +61,10 @@ export class UpdateFlashcardDto {
   @IsString()
   @IsOptional()
   back?: string;
+}
+
+export class ShareFlashcardSetDto {
+  @IsUUID()
+  @IsNotEmpty()
+  group_id!: string;
 }

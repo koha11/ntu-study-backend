@@ -15,6 +15,7 @@ import type { CreateTaskDto, UpdateTaskDto } from './dto/task.dto';
 import { NotificationsService } from '@modules/notifications/notifications.service';
 import { UsersService } from '@modules/users/users.service';
 import { EmailService } from '@common/services/email.service';
+import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 import {
   NOTIFICATION_TYPE,
   RELATED_ENTITY_TYPE,
@@ -41,6 +42,7 @@ export class TasksService {
     private readonly usersService: UsersService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
+    private readonly groupEmailThreadService: GroupEmailThreadService,
   ) {}
 
   async create(userId: string, dto: CreateTaskDto): Promise<Task> {
@@ -63,7 +65,9 @@ export class TasksService {
       groupId = parent.group_id;
       parentTaskId = parent.id;
       if (dto.group_id && parent.group_id && dto.group_id !== parent.group_id) {
-        throw new BadRequestException('group_id must match the parent task group');
+        throw new BadRequestException(
+          'group_id must match the parent task group',
+        );
       }
       if (dto.group_id && !parent.group_id) {
         throw new BadRequestException(
@@ -341,7 +345,11 @@ export class TasksService {
     task: Task,
     actorUserId: string,
   ): Promise<void> {
-    if (!task.group_id || !task.assignee_id || task.assignee_id === actorUserId) {
+    if (
+      !task.group_id ||
+      !task.assignee_id ||
+      task.assignee_id === actorUserId
+    ) {
       return;
     }
     await this.sendAssigneeTaskAssigned(task, actorUserId);
@@ -365,7 +373,11 @@ export class TasksService {
     task: Task,
     editorUserId: string,
   ): Promise<void> {
-    if (!task.group_id || !task.assignee_id || task.assignee_id === editorUserId) {
+    if (
+      !task.group_id ||
+      !task.assignee_id ||
+      task.assignee_id === editorUserId
+    ) {
       return;
     }
     const group = await this.groupsRepository.findOne({
@@ -387,11 +399,16 @@ export class TasksService {
       related_entity_id: task.id,
     });
     if (assignee.notification_enabled) {
+      const thread = await this.groupEmailThreadService.findByGroupAndUser(
+        group.id,
+        assignee.id,
+      );
       await this.emailService.sendTaskAssignedEmail({
         toEmail: assignee.email,
         taskTitle: task.title,
         groupName: group.name,
         taskUrl,
+        threadMessageId: thread?.thread_message_id,
       });
     }
   }
@@ -424,12 +441,17 @@ export class TasksService {
       related_entity_id: task.id,
     });
     if (leader.notification_enabled) {
+      const thread = await this.groupEmailThreadService.findByGroupAndUser(
+        group.id,
+        leader.id,
+      );
       await this.emailService.sendTaskPendingReviewEmail({
         toEmail: leader.email,
         taskTitle: task.title,
         groupName: group.name,
         submitterName,
         taskUrl,
+        threadMessageId: thread?.thread_message_id,
       });
     }
   }
@@ -457,12 +479,17 @@ export class TasksService {
       related_entity_id: task.id,
     });
     if (assignee.notification_enabled) {
+      const thread = await this.groupEmailThreadService.findByGroupAndUser(
+        group.id,
+        assignee.id,
+      );
       await this.emailService.sendTaskReviewResultEmail({
         toEmail: assignee.email,
         taskTitle: task.title,
         groupName: group.name,
         outcome,
         taskUrl,
+        threadMessageId: thread?.thread_message_id,
       });
     }
   }

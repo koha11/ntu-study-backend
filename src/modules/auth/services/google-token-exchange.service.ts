@@ -163,9 +163,7 @@ export class GoogleTokenExchangeService {
     const creds = this.oauth2Client.credentials;
     return {
       access_token: token,
-      expiry_date: creds.expiry_date
-        ? new Date(creds.expiry_date)
-        : undefined,
+      expiry_date: creds.expiry_date ? new Date(creds.expiry_date) : undefined,
     };
   }
 }

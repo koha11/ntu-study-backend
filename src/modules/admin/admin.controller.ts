@@ -107,7 +107,10 @@ export class AdminController {
     description:
       'Known names: overdue-task-reminders, notification-cleanup (see CRON_JOB_NAMES).',
   })
-  @ApiResponse({ status: 204, description: 'Job finished (check cron_job_runs for status)' })
+  @ApiResponse({
+    status: 204,
+    description: 'Job finished (check cron_job_runs for status)',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Unknown job name' })
   async runCronJob(@Param('name') name: string): Promise<void> {

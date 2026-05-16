@@ -2,7 +2,9 @@ import type { User } from '@modules/users/entities/user.entity';
 import type { Task } from './entities/task.entity';
 
 /** Public assignee payload for task APIs (no tokens or sensitive user fields). */
-function publicAssignee(user: User | undefined | null): Record<string, unknown> | null {
+function publicAssignee(
+  user: User | undefined | null,
+): Record<string, unknown> | null {
   if (!user?.id) return null;
   return {
     id: user.id,
@@ -11,7 +13,9 @@ function publicAssignee(user: User | undefined | null): Record<string, unknown> 
   };
 }
 
-function publicParent(parent: Task | undefined | null): Record<string, unknown> | null {
+function publicParent(
+  parent: Task | undefined | null,
+): Record<string, unknown> | null {
   if (!parent?.id) return null;
   return {
     id: parent.id,
@@ -39,7 +43,7 @@ export function serializeTaskForApi(task: Task): Record<string, unknown> {
     submitted_at: task.submitted_at ?? null,
     reviewed_at: task.reviewed_at ?? null,
     reviewed_by_id: task.reviewed_by_id ?? null,
-    assignee: publicAssignee(task.assignee as User | undefined),
+    assignee: publicAssignee(task.assignee),
     parent_task: publicParent(task.parent_task),
     subtasks: (task.subtasks ?? []).map(serializeTaskForApi),
   };

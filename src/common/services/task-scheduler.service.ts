@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import { EmailService } from './email.service';
+import { GroupEmailThreadService } from './group-email-thread.service';
 import { Task } from '../../modules/tasks/entities/task.entity';
 import { TaskStatus } from '../enums/task-status.enum';
 import { User } from '../../modules/users/entities/user.entity';
@@ -26,6 +27,7 @@ export class TaskSchedulerService {
     @InjectRepository(CronJobRun)
     private cronJobRunsRepository: Repository<CronJobRun>,
     private emailService: EmailService,
+    private groupEmailThreadService: GroupEmailThreadService,
   ) {}
 
   private async recordJobRun(
@@ -84,16 +86,10 @@ export class TaskSchedulerService {
 
     const overdueTasks = await this.tasksRepository.find({
       where: [
-        {
-          due_date: LessThan(now),
-          status: TaskStatus.TODO,
-        },
-        {
-          due_date: LessThan(now),
-          status: TaskStatus.IN_PROGRESS,
-        },
+        { due_date: LessThan(now), status: TaskStatus.TODO },
+        { due_date: LessThan(now), status: TaskStatus.IN_PROGRESS },
       ],
-      relations: ['assignee'],
+      relations: ['assignee', 'group'],
     });
 
     if (overdueTasks.length === 0) {
@@ -103,56 +99,73 @@ export class TaskSchedulerService {
 
     this.logger.log(`Found ${overdueTasks.length} overdue tasks`);
 
-    const tasksByUser = new Map<string, Task[]>();
+    // Group by userId → groupKey ('personal' or groupId) → tasks
+    const byUserAndGroup = new Map<string, Map<string, Task[]>>();
     for (const task of overdueTasks) {
-      if (task.assignee) {
-        const userId = task.assignee.id;
-        if (!tasksByUser.has(userId)) {
-          tasksByUser.set(userId, []);
-        }
-        tasksByUser.get(userId)!.push(task);
-      }
+      if (!task.assignee) continue;
+      const uid = task.assignee.id;
+      const gkey = task.group_id ?? 'personal';
+      if (!byUserAndGroup.has(uid)) byUserAndGroup.set(uid, new Map());
+      const byGroup = byUserAndGroup.get(uid)!;
+      if (!byGroup.has(gkey)) byGroup.set(gkey, []);
+      byGroup.get(gkey)!.push(task);
     }
 
-    for (const [userId, tasks] of tasksByUser.entries()) {
-      const user = await this.usersRepository.findOne({
-        where: { id: userId },
-      });
+    const base =
+      (process.env.FRONTEND_URL ?? 'http://localhost:5173').replace(/\/$/, '');
 
-      if (!user) {
-        continue;
-      }
+    for (const [userId, byGroup] of byUserAndGroup.entries()) {
+      const user = await this.usersRepository.findOne({ where: { id: userId } });
+      if (!user) continue;
 
-      const hasEmailNotification = user.notification_enabled !== false;
-
-      if (hasEmailNotification) {
+      for (const [groupKey, tasks] of byGroup.entries()) {
+        // Always create in-app notifications regardless of email preference
         for (const task of tasks) {
-          if (task.due_date) {
-            await this.emailService.sendTaskReminder(
-              user.email,
-              task.title,
-              task.due_date,
-            );
-          }
+          const notification = new Notification();
+          notification.recipient = user;
+          notification.recipient_id = user.id;
+          notification.type = 'Task Overdue';
+          notification.message = `Your task "${task.title}" is overdue${
+            task.due_date ? ` (due ${task.due_date.toLocaleDateString()})` : ''
+          }`;
+          notification.is_read = false;
+          notification.delivery_channel = NotificationDeliveryChannel.WEB;
+          await this.notificationsRepository.save(notification);
         }
-      }
 
-      for (const task of tasks) {
-        const notification = new Notification();
-        notification.recipient = user;
-        notification.recipient_id = user.id;
-        notification.type = `Task Overdue`;
-        notification.message = `Your task "${task.title}" is overdue${
-          task.due_date ? ` (due ${task.due_date.toLocaleDateString()})` : ''
-        }`;
-        notification.is_read = false;
-        notification.delivery_channel = NotificationDeliveryChannel.WEB;
+        if (user.notification_enabled === false) continue;
 
-        await this.notificationsRepository.save(notification);
+        const taskItems = tasks
+          .filter((t) => t.due_date)
+          .map((t) => ({ title: t.title, dueDate: t.due_date! }));
+        if (taskItems.length === 0) continue;
+
+        if (groupKey === 'personal') {
+          // Personal tasks: send one batched email with no threading
+          await this.emailService.sendBatchedTaskReminderEmail({
+            toEmail: user.email,
+            groupName: 'Personal Tasks',
+            tasks: taskItems,
+            groupUrl: `${base}/tasks`,
+          });
+        } else {
+          const groupName = tasks[0].group?.name ?? groupKey;
+          const thread = await this.groupEmailThreadService.findByGroupAndUser(
+            groupKey,
+            userId,
+          );
+          await this.emailService.sendBatchedTaskReminderEmail({
+            toEmail: user.email,
+            groupName,
+            tasks: taskItems,
+            groupUrl: `${base}/groups/${groupKey}`,
+            threadMessageId: thread?.thread_message_id,
+          });
+        }
       }
     }
 
-    this.logger.log(`Sent overdue reminders to ${tasksByUser.size} users`);
+    this.logger.log(`Sent overdue reminders to ${byUserAndGroup.size} users`);
   }
 
   /**

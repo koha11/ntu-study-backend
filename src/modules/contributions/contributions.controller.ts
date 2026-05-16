@@ -95,13 +95,13 @@ export class ContributionsController {
     );
   }
 
-  @Put('groups/:groupId/rounds/:roundStartedAt/ratings/:rateeId')
-  @ApiOperation({ summary: 'Submit or update a peer rating' })
+  @Put('groups/:groupId/rounds/:roundStartedAt/ratings/:taskId')
+  @ApiOperation({ summary: 'Submit or update a task rating' })
   submitRating(
     @Req() req: Request,
     @Param('groupId', ParseUUIDPipe) groupId: string,
     @Param('roundStartedAt') roundStartedAtParam: string,
-    @Param('rateeId', ParseUUIDPipe) rateeId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
     @Body() dto: SubmitRatingDto,
   ) {
     const user = req.user as JwtRequestUser;
@@ -111,7 +111,7 @@ export class ContributionsController {
       groupId,
       roundStartedAt,
       user.id,
-      rateeId,
+      taskId,
       dto.score,
     );
   }

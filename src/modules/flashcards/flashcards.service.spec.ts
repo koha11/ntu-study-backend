@@ -6,6 +6,8 @@ import { FlashcardsService } from './flashcards.service';
 import { FlashcardSet } from './entities/flashcard-set.entity';
 import { Flashcard } from './entities/flashcard.entity';
 import { FlashcardStudyLog } from './entities/flashcard-study-log.entity';
+import { SharedGroupFlashcard } from './entities/shared-group-flashcard.entity';
+import { GroupMember } from '@modules/groups/entities/group-member.entity';
 
 describe('FlashcardsService', () => {
   let service: FlashcardsService;
@@ -75,6 +77,30 @@ describe('FlashcardsService', () => {
         {
           provide: getRepositoryToken(FlashcardStudyLog),
           useValue: studyLogsRepository,
+        },
+        {
+          provide: getRepositoryToken(SharedGroupFlashcard),
+          useValue: (() => {
+            const qb = {
+              innerJoin: vi.fn(),
+              where: vi.fn(),
+              getOne: vi.fn().mockResolvedValue(null),
+            };
+            qb.innerJoin.mockReturnValue(qb);
+            qb.where.mockReturnValue(qb);
+            return {
+              find: vi.fn(),
+              findOne: vi.fn(),
+              create: vi.fn(),
+              save: vi.fn(),
+              remove: vi.fn(),
+              createQueryBuilder: vi.fn().mockReturnValue(qb),
+            };
+          })(),
+        },
+        {
+          provide: getRepositoryToken(GroupMember),
+          useValue: { findOne: vi.fn() },
         },
       ],
     }).compile();

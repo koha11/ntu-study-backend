@@ -54,12 +54,8 @@ export class NotificationsController {
     @Query('unread') unread?: string,
   ) {
     const user = req.user;
-    const unreadOnly =
-      unread === 'true' || unread === '1' ? true : undefined;
-    return this.notificationsService.getUserNotifications(
-      user.id,
-      unreadOnly,
-    );
+    const unreadOnly = unread === 'true' || unread === '1' ? true : undefined;
+    return this.notificationsService.getUserNotifications(user.id, unreadOnly);
   }
 
   @Patch(':id/read')

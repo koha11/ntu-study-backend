@@ -103,7 +103,9 @@ export class GroupsController {
 
   @Post(':id/calendar/events')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create an event on the group shared calendar (leader only)' })
+  @ApiOperation({
+    summary: 'Create an event on the group shared calendar (leader only)',
+  })
   @ApiResponse({ status: 201, description: 'Event created' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
   @ApiResponse({ status: 403, description: 'Forbidden' })

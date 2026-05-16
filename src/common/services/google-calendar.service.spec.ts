@@ -150,7 +150,12 @@ describe('GoogleCalendarService', () => {
 
       const min = new Date('2026-06-01T00:00:00.000Z');
       const max = new Date('2026-06-07T00:00:00.000Z');
-      const rows = await service.listEventsInRange('tok', 'cal@group.calendar.google.com', min, max);
+      const rows = await service.listEventsInRange(
+        'tok',
+        'cal@group.calendar.google.com',
+        min,
+        max,
+      );
 
       expect(listMock).toHaveBeenCalledWith({
         calendarId: 'cal@group.calendar.google.com',
@@ -183,7 +188,11 @@ describe('GoogleCalendarService', () => {
     });
 
     it('passes description when provided', async () => {
-      await service.createSecondaryCalendar('tok', 'G1', 'NTU Study group calendar');
+      await service.createSecondaryCalendar(
+        'tok',
+        'G1',
+        'NTU Study group calendar',
+      );
 
       expect(calendarsInsertMock).toHaveBeenCalledWith({
         requestBody: {
@@ -238,7 +247,9 @@ describe('GoogleCalendarService', () => {
       expect(callArg.calendarId).toBe('shared@group.calendar.google.com');
       expect(callArg.conferenceDataVersion).toBe(0);
       expect(callArg.requestBody.location).toBe('Library — Level 3');
-      expect(callArg.requestBody.description).toContain('Map: https://maps.google.com/?q=NTU');
+      expect(callArg.requestBody.description).toContain(
+        'Map: https://maps.google.com/?q=NTU',
+      );
       expect(result.meet_link).toBeNull();
       expect(result.event_id).toBe('off1');
     });
@@ -265,7 +276,9 @@ describe('GoogleCalendarService', () => {
         requestBody: Record<string, unknown>;
       };
       expect(callArg.conferenceDataVersion).toBe(0);
-      expect(callArg.requestBody.location).toBe('https://meet.google.com/aaa-bbbb-ccc');
+      expect(callArg.requestBody.location).toBe(
+        'https://meet.google.com/aaa-bbbb-ccc',
+      );
       expect(callArg.requestBody.conferenceData).toBeUndefined();
       expect(result.meet_link).toBe('https://meet.google.com/aaa-bbbb-ccc');
     });
@@ -277,7 +290,10 @@ describe('GoogleCalendarService', () => {
           htmlLink: 'https://calendar.google.com/y',
           conferenceData: {
             entryPoints: [
-              { entryPointType: 'video', uri: 'https://meet.google.com/new-new-new' },
+              {
+                entryPointType: 'video',
+                uri: 'https://meet.google.com/new-new-new',
+              },
             ],
           },
         },
@@ -300,7 +316,8 @@ describe('GoogleCalendarService', () => {
       };
       expect(callArg.conferenceDataVersion).toBe(1);
       expect(
-        (callArg.requestBody.conferenceData as { createRequest?: unknown })?.createRequest,
+        (callArg.requestBody.conferenceData as { createRequest?: unknown })
+          ?.createRequest,
       ).toBeDefined();
       expect(result.meet_link).toBe('https://meet.google.com/new-new-new');
     });

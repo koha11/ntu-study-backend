@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, Index, JoinColumn, RelationId } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  Index,
+  JoinColumn,
+  RelationId,
+} from 'typeorm';
 import { BaseEntity } from '@common/entities/base.entity';
 import { FlashcardSet } from './flashcard-set.entity';
 

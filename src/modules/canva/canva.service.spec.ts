@@ -57,8 +57,7 @@ describe('CanvaService', () => {
       const result = await service.exchangeAuthorizationCode({
         code: 'auth-code',
         codeVerifier: 'verifier-verifier-verifier-verifier-verifier',
-        redirectUri:
-          'http://localhost:3000/auth/canva/callback',
+        redirectUri: 'http://localhost:3000/auth/canva/callback',
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(1);

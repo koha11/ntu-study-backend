@@ -37,6 +37,8 @@ export class UpdateUserDto {
   /** Manual Drive quota cap in bytes (decimal string). Null clears the limit. */
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== undefined)
-  @Matches(/^\d+$/, { message: 'drive_total_quota must be a non-negative integer string' })
+  @Matches(/^\d+$/, {
+    message: 'drive_total_quota must be a non-negative integer string',
+  })
   drive_total_quota?: string | null;
 }

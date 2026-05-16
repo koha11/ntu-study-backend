@@ -62,7 +62,9 @@ export class CanvaAuthController {
   }
 
   @Get('callback')
-  @ApiOperation({ summary: 'Canva OAuth redirect target (configured in Canva portal)' })
+  @ApiOperation({
+    summary: 'Canva OAuth redirect target (configured in Canva portal)',
+  })
   async callback(
     @Query('code') code: string | undefined,
     @Query('state') state: string | undefined,
@@ -101,9 +103,7 @@ export class CanvaAuthController {
     });
 
     if (!tokens) {
-      res.redirect(
-        `${frontend}/canva-connected?error=token_exchange_failed`,
-      );
+      res.redirect(`${frontend}/canva-connected?error=token_exchange_failed`);
       return;
     }
 

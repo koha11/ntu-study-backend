@@ -3,12 +3,15 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FlashcardSet } from './entities/flashcard-set.entity';
 import { Flashcard } from './entities/flashcard.entity';
 import { FlashcardStudyLog } from './entities/flashcard-study-log.entity';
+import { SharedGroupFlashcard } from './entities/shared-group-flashcard.entity';
+import { GroupMember } from '@modules/groups/entities/group-member.entity';
 
 export type CreateFlashcardSetInput = {
   name: string;
@@ -50,6 +53,18 @@ export type FlashcardSetListRow = FlashcardSet & {
   next_review_at?: Date | null;
 };
 
+export type SharedFlashcardSetRow = {
+  share_id: string;
+  shared_at: Date;
+  set_id: string;
+  group_id: string;
+  owner_id: string;
+  name: string;
+  subject: string | null;
+  description: string | null;
+  card_count: number;
+};
+
 @Injectable()
 export class FlashcardsService {
   constructor(
@@ -59,6 +74,10 @@ export class FlashcardsService {
     private cardsRepository: Repository<Flashcard>,
     @InjectRepository(FlashcardStudyLog)
     private studyLogsRepository: Repository<FlashcardStudyLog>,
+    @InjectRepository(SharedGroupFlashcard)
+    private sharedRepository: Repository<SharedGroupFlashcard>,
+    @InjectRepository(GroupMember)
+    private groupMembersRepository: Repository<GroupMember>,
   ) {}
 
   async createSet(
@@ -75,6 +94,20 @@ export class FlashcardsService {
     return this.setsRepository.save(entity);
   }
 
+  private async isSetAccessibleByUser(setId: string, userId: string): Promise<boolean> {
+    const shared = await this.sharedRepository
+      .createQueryBuilder('s')
+      .innerJoin(
+        'group_members',
+        'gm',
+        'gm.group_id = s.group_id AND gm.user_id = :userId',
+        { userId },
+      )
+      .where('s.set_id = :setId', { setId })
+      .getOne();
+    return Boolean(shared);
+  }
+
   async findSet(setId: string, userId: string): Promise<FlashcardSet> {
     const set = await this.setsRepository.findOne({
       where: { id: setId },
@@ -84,7 +117,10 @@ export class FlashcardsService {
       throw new NotFoundException('Flashcard set not found');
     }
     if (set.owner_id !== userId) {
-      throw new ForbiddenException('You do not own this flashcard set');
+      const accessible = await this.isSetAccessibleByUser(setId, userId);
+      if (!accessible) {
+        throw new ForbiddenException('You do not have access to this flashcard set');
+      }
     }
     return set;
   }
@@ -227,7 +263,10 @@ export class FlashcardsService {
       throw new NotFoundException('Flashcard set not found');
     }
     if (set.owner_id !== userId) {
-      throw new ForbiddenException('You do not own this flashcard set');
+      const accessible = await this.isSetAccessibleByUser(setId, userId);
+      if (!accessible) {
+        throw new ForbiddenException('You do not have access to this flashcard set');
+      }
     }
 
     const latest = await this.studyLogsRepository.findOne({
@@ -256,7 +295,10 @@ export class FlashcardsService {
       throw new NotFoundException('Flashcard set not found');
     }
     if (set.owner_id !== userId) {
-      throw new ForbiddenException('You do not own this flashcard set');
+      const accessible = await this.isSetAccessibleByUser(setId, userId);
+      if (!accessible) {
+        throw new ForbiddenException('You do not have access to this flashcard set');
+      }
     }
 
     const now = new Date();
@@ -269,5 +311,88 @@ export class FlashcardsService {
       next_review_at: nextAt,
     });
     return this.studyLogsRepository.save(log);
+  }
+
+  async shareSetWithGroup(
+    userId: string,
+    setId: string,
+    groupId: string,
+  ): Promise<SharedGroupFlashcard> {
+    const set = await this.setsRepository.findOne({ where: { id: setId } });
+    if (!set) {
+      throw new NotFoundException('Flashcard set not found');
+    }
+    if (set.owner_id !== userId) {
+      throw new ForbiddenException('You do not own this flashcard set');
+    }
+
+    const membership = await this.groupMembersRepository.findOne({
+      where: { group_id: groupId, user_id: userId },
+    });
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this group');
+    }
+
+    const existing = await this.sharedRepository.findOne({
+      where: { set_id: setId, group_id: groupId },
+    });
+    if (existing) {
+      throw new ConflictException('This set is already shared with the group');
+    }
+
+    const record = this.sharedRepository.create({ set_id: setId, group_id: groupId });
+    return this.sharedRepository.save(record);
+  }
+
+  async unshareSetFromGroup(
+    userId: string,
+    setId: string,
+    groupId: string,
+  ): Promise<void> {
+    const set = await this.setsRepository.findOne({ where: { id: setId } });
+    if (!set) {
+      throw new NotFoundException('Flashcard set not found');
+    }
+    if (set.owner_id !== userId) {
+      throw new ForbiddenException('You do not own this flashcard set');
+    }
+
+    const record = await this.sharedRepository.findOne({
+      where: { set_id: setId, group_id: groupId },
+    });
+    if (!record) {
+      throw new NotFoundException('Shared record not found');
+    }
+    await this.sharedRepository.remove(record);
+  }
+
+  async getGroupSharedSets(
+    userId: string,
+    groupId: string,
+  ): Promise<SharedFlashcardSetRow[]> {
+    const membership = await this.groupMembersRepository.findOne({
+      where: { group_id: groupId, user_id: userId },
+    });
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this group');
+    }
+
+    const records = await this.sharedRepository.find({
+      where: { group_id: groupId },
+      relations: ['flashcard_set'],
+      order: { created_at: 'DESC' },
+    });
+
+    return records.map((r) => ({
+      share_id: r.id,
+      shared_at: r.created_at,
+      set_id: r.set_id,
+      group_id: r.group_id,
+      owner_id: r.flashcard_set.owner_id,
+      name: r.flashcard_set.name,
+      subject: r.flashcard_set.subject ?? null,
+      description: r.flashcard_set.description ?? null,
+      card_count: r.flashcard_set.card_count,
+    }));
   }
 }

@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, OneToMany, Index, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  Index,
+  JoinColumn,
+} from 'typeorm';
 import { GroupStatus } from '@common/enums';
 import { BaseEntity } from '@common/entities/base.entity';
 import { User } from '@modules/users/entities/user.entity';

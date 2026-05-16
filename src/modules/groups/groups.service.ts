@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { In, Repository } from 'typeorm';
 import { Group } from './entities/group.entity';
 import { GroupMember } from './entities/group-member.entity';
@@ -16,6 +17,8 @@ import { GoogleCalendarService } from '@common/services/google-calendar.service'
 import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
 import { CanvaService } from '@modules/canva/canva.service';
 import { InvitationsService } from '@modules/invitations/invitations.service';
+import { EmailService } from '@common/services/email.service';
+import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 import type {
   CreateGroupDto,
   CreateGroupCalendarEventDto,
@@ -61,6 +64,9 @@ export class GroupsService {
     private readonly googleAccessTokenService: GoogleAccessTokenService,
     private readonly canvaService: CanvaService,
     private readonly invitationsService: InvitationsService,
+    private readonly emailService: EmailService,
+    private readonly groupEmailThreadService: GroupEmailThreadService,
+    private readonly configService: ConfigService,
   ) {}
 
   async create(leaderId: string, dto: CreateGroupDto): Promise<Group> {
@@ -131,6 +137,21 @@ export class GroupsService {
           saved.google_calendar_id = calendarId;
           await this.groupsRepository.save(saved);
         }
+      }
+    }
+
+    if (leader && leader.notification_enabled !== false) {
+      const base =
+        this.configService.get<string>('FRONTEND_URL')?.replace(/\/$/, '') ??
+        'http://localhost:5173';
+      const messageId = await this.emailService.sendGroupCreatedEmail({
+        toEmail: leader.email,
+        leaderName: leader.full_name,
+        groupName: name,
+        groupUrl: `${base}/groups/${saved.id}`,
+      });
+      if (messageId) {
+        await this.groupEmailThreadService.create(saved.id, leaderId, messageId);
       }
     }
 
@@ -293,7 +314,9 @@ export class GroupsService {
       if (/grant calendar|sign in again/i.test(message)) {
         throw new ForbiddenException(message);
       }
-      throw new BadRequestException(message || 'Failed to list calendar events');
+      throw new BadRequestException(
+        message || 'Failed to list calendar events',
+      );
     }
   }
 
@@ -309,7 +332,9 @@ export class GroupsService {
     this.assertLeader(group, leaderId);
 
     if (group.status === GroupStatus.LOCKED) {
-      throw new ForbiddenException('Cannot schedule meetings for a locked group');
+      throw new ForbiddenException(
+        'Cannot schedule meetings for a locked group',
+      );
     }
 
     const calendarId = group.google_calendar_id?.trim();
@@ -426,7 +451,9 @@ export class GroupsService {
       if (/grant calendar|sign in again/i.test(message)) {
         throw new ForbiddenException(message);
       }
-      throw new BadRequestException(message || 'Failed to create Calendar event');
+      throw new BadRequestException(
+        message || 'Failed to create Calendar event',
+      );
     }
   }
 
@@ -441,7 +468,9 @@ export class GroupsService {
     const group = await this.requireGroup(groupId);
     this.assertLeader(group, leaderId);
     if (group.status === GroupStatus.LOCKED) {
-      throw new ForbiddenException('Cannot schedule meetings for a locked group');
+      throw new ForbiddenException(
+        'Cannot schedule meetings for a locked group',
+      );
     }
 
     const start = new Date(dto.start);
@@ -509,7 +538,9 @@ export class GroupsService {
       if (/grant calendar|sign in again/i.test(message)) {
         throw new ForbiddenException(message);
       }
-      throw new BadRequestException(message || 'Failed to create Calendar event');
+      throw new BadRequestException(
+        message || 'Failed to create Calendar event',
+      );
     }
   }
 

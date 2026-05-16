@@ -5,11 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { Repository, IsNull, Not, In } from 'typeorm';
 import { ContributionRating } from './entities/contribution-rating.entity';
 import { Group } from '@modules/groups/entities/group.entity';
 import { GroupMember } from '@modules/groups/entities/group-member.entity';
+import { Task } from '@modules/tasks/entities/task.entity';
 import { User } from '@modules/users/entities/user.entity';
+import { TaskStatus } from '@common/enums';
+import { EmailService } from '@common/services/email.service';
+import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 
 export interface EvaluationRoundRow {
   round_started_at: string;
@@ -20,14 +25,15 @@ export interface EvaluationRoundRow {
 }
 
 export interface MyRatingRow {
-  ratee_id: string;
-  ratee_full_name: string;
+  task_id: string;
+  task_title: string;
+  assignee_full_name: string;
   score: number | null;
 }
 
 export interface AggregatedRatingRow {
-  ratee_id: string;
-  ratee_full_name: string;
+  assignee_id: string;
+  assignee_full_name: string;
   average_score: number | null;
 }
 
@@ -40,6 +46,13 @@ export class ContributionsService {
     private readonly groupsRepository: Repository<Group>,
     @InjectRepository(GroupMember)
     private readonly membersRepository: Repository<GroupMember>,
+    @InjectRepository(Task)
+    private readonly tasksRepository: Repository<Task>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
+    private readonly emailService: EmailService,
+    private readonly groupEmailThreadService: GroupEmailThreadService,
+    private readonly configService: ConfigService,
   ) {}
 
   parseRoundStartedAt(param: string): Date {
@@ -97,6 +110,36 @@ export class ContributionsService {
     return memberships.map((m) => m.user_id);
   }
 
+  /**
+   * Get eligible DONE tasks for evaluation:
+   * - Status is DONE
+   * - Has an assignee
+   * - Assignee is an active member of the group
+   */
+  private async getEligibleTasksForEvaluation(
+    groupId: string,
+  ): Promise<Task[]> {
+    const activeUserIds = await this.getActiveMemberUserIds(groupId);
+    if (activeUserIds.length === 0) {
+      return [];
+    }
+
+    return this.tasksRepository
+      .find({
+        where: {
+          group_id: groupId,
+          status: TaskStatus.DONE,
+          assignee_id: Not(IsNull()),
+        },
+      })
+      .then((tasks) =>
+        // Filter to only include tasks with assignees who are active members
+        tasks.filter(
+          (t) => t.assignee_id && activeUserIds.includes(t.assignee_id),
+        ),
+      );
+  }
+
   async openEvaluation(
     groupId: string,
     leaderId: string,
@@ -118,26 +161,50 @@ export class ContributionsService {
       throw new BadRequestException('due_date must be in the future');
     }
 
-    const userIds = await this.getActiveMemberUserIds(groupId);
-    if (userIds.length < 2) {
+    const activeUserIds = await this.getActiveMemberUserIds(groupId);
+    if (activeUserIds.length < 2) {
       throw new BadRequestException(
         'At least two active members are required to open peer evaluation',
       );
     }
 
+    const eligibleTasks = await this.getEligibleTasksForEvaluation(groupId);
+    if (eligibleTasks.length === 0) {
+      throw new BadRequestException(
+        'No eligible DONE tasks with active assignees found for evaluation',
+      );
+    }
+
     const roundStartedAt = new Date();
 
+    // For each eligible task, create a rating row for each rater who hasn't rated it yet
+    // Raters = active members who are NOT the task assignee
     const rows: ContributionRating[] = [];
-    for (const raterId of userIds) {
-      for (const rateeId of userIds) {
-        if (raterId === rateeId) {
+    for (const task of eligibleTasks) {
+      for (const raterId of activeUserIds) {
+        if (raterId === task.assignee_id) {
+          // Assignee cannot rate their own task
           continue;
         }
+
+        // Check if this rater has already rated this task (globally, not per round)
+        const existingRating = await this.ratingsRepository.findOne({
+          where: {
+            task: { id: task.id },
+            rater: { id: raterId },
+          },
+        });
+
+        if (existingRating) {
+          // Skip if already rated
+          continue;
+        }
+
         rows.push(
           this.ratingsRepository.create({
             group: { id: groupId } as Group,
+            task: { id: task.id } as Task,
             rater: { id: raterId } as User,
-            ratee: { id: rateeId } as User,
             round_started_at: roundStartedAt,
             due_date: dueDate,
             is_round_closed: false,
@@ -149,11 +216,46 @@ export class ContributionsService {
 
     await this.ratingsRepository.save(rows);
 
+    await this.notifyMembersEvaluationOpened(groupId, group, dueDate, activeUserIds);
+
     return {
       round_started_at: roundStartedAt.toISOString(),
       due_date: dueDate.toISOString(),
       ratings_created: rows.length,
     };
+  }
+
+  private async notifyMembersEvaluationOpened(
+    groupId: string,
+    group: Group,
+    dueDate: Date,
+    activeUserIds: string[],
+  ): Promise<void> {
+    const base =
+      this.configService.get<string>('FRONTEND_URL')?.replace(/\/$/, '') ??
+      'http://localhost:5173';
+    const groupUrl = `${base}/groups/${groupId}`;
+
+    const users = await this.usersRepository.find({
+      where: { id: In(activeUserIds) },
+    });
+
+    for (const user of users) {
+      if (user.notification_enabled === false) {
+        continue;
+      }
+      const thread = await this.groupEmailThreadService.findByGroupAndUser(
+        groupId,
+        user.id,
+      );
+      await this.emailService.sendContributionOpenEmail({
+        toEmail: user.email,
+        groupName: group.name,
+        dueDate,
+        groupUrl,
+        threadMessageId: thread?.thread_message_id,
+      });
+    }
   }
 
   async closeEvaluation(
@@ -226,11 +328,12 @@ export class ContributionsService {
 
     const rows = await this.ratingsRepository
       .createQueryBuilder('cr')
-      .innerJoinAndSelect('cr.ratee', 'ratee')
+      .innerJoinAndSelect('cr.task', 'task')
+      .leftJoinAndSelect('task.assignee', 'assignee')
       .where('cr.group_id = :groupId', { groupId })
       .andWhere('cr.round_started_at = :roundStartedAt', { roundStartedAt })
       .andWhere('cr.rater_id = :userId', { userId })
-      .orderBy('cr.ratee_id', 'ASC')
+      .orderBy('task.title', 'ASC')
       .getMany();
 
     if (rows.length === 0) {
@@ -238,8 +341,9 @@ export class ContributionsService {
     }
 
     return rows.map((r) => ({
-      ratee_id: r.ratee.id,
-      ratee_full_name: r.ratee?.full_name?.trim() ?? '',
+      task_id: r.task.id,
+      task_title: r.task.title,
+      assignee_full_name: r.task.assignee?.full_name?.trim() ?? '',
       score: r.score,
     }));
   }
@@ -248,22 +352,18 @@ export class ContributionsService {
     groupId: string,
     roundStartedAt: Date,
     raterId: string,
-    rateeId: string,
+    taskId: string,
     score: number,
   ): Promise<{ ok: true }> {
     const group = await this.requireGroup(groupId);
     await this.assertCanAccessGroup(groupId, group, raterId);
-
-    if (raterId === rateeId) {
-      throw new BadRequestException('Cannot rate yourself');
-    }
 
     const row = await this.ratingsRepository.findOne({
       where: {
         group: { id: groupId },
         round_started_at: roundStartedAt,
         rater: { id: raterId },
-        ratee: { id: rateeId },
+        task: { id: taskId },
       },
     });
 
@@ -309,25 +409,26 @@ export class ContributionsService {
 
     const raw = await this.ratingsRepository
       .createQueryBuilder('cr')
-      .innerJoin('cr.ratee', 'ratee')
-      .select('cr.ratee_id', 'ratee_id')
-      .addSelect('ratee.full_name', 'ratee_full_name')
+      .innerJoin('cr.task', 'task')
+      .innerJoin('task.assignee', 'assignee')
+      .select('task.assignee_id', 'assignee_id')
+      .addSelect('assignee.full_name', 'assignee_full_name')
       .addSelect('ROUND(AVG(cr.score)::numeric, 2)', 'average_score')
       .where('cr.group_id = :groupId', { groupId })
       .andWhere('cr.round_started_at = :roundStartedAt', { roundStartedAt })
       .andWhere('cr.score IS NOT NULL')
-      .groupBy('cr.ratee_id')
-      .addGroupBy('ratee.full_name')
-      .orderBy('cr.ratee_id', 'ASC')
+      .groupBy('task.assignee_id')
+      .addGroupBy('assignee.full_name')
+      .orderBy('task.assignee_id', 'ASC')
       .getRawMany<{
-        ratee_id: string;
-        ratee_full_name: string;
+        assignee_id: string;
+        assignee_full_name: string;
         average_score: string | null;
       }>();
 
     return raw.map((r) => ({
-      ratee_id: r.ratee_id,
-      ratee_full_name: r.ratee_full_name ?? '',
+      assignee_id: r.assignee_id,
+      assignee_full_name: r.assignee_full_name ?? '',
       average_score:
         r.average_score != null ? parseFloat(r.average_score) : null,
     }));

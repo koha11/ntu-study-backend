@@ -75,7 +75,10 @@ export class InvitationsController {
   @ApiBearerAuth('JWT')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Resend group invitation (leader only)' })
-  @ApiResponse({ status: 201, description: 'New invitation created and email sent' })
+  @ApiResponse({
+    status: 201,
+    description: 'New invitation created and email sent',
+  })
   @ApiResponse({ status: 400, description: 'Invalid invitation' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Not found' })
@@ -125,7 +128,8 @@ export class InvitationsController {
       outgoing = new URL(target);
     } catch {
       res.status(500).json({
-        message: 'Invalid FRONTEND_URL — must be a full URL (e.g. http://localhost:5173)',
+        message:
+          'Invalid FRONTEND_URL — must be a full URL (e.g. http://localhost:5173)',
       });
       return;
     }

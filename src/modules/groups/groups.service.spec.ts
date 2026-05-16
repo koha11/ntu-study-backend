@@ -20,6 +20,9 @@ import { GroupStatus } from '@common/enums';
 import { User } from '@modules/users/entities/user.entity';
 import { UserRole, InvitationStatus } from '@common/enums';
 import { GroupInvitation } from './entities/group-invitation.entity';
+import { EmailService } from '@common/services/email.service';
+import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('GroupsService', () => {
   let service: GroupsService;
@@ -55,6 +58,11 @@ describe('GroupsService', () => {
   };
   let googleAccessTokenService: {
     resolveGoogleAccessToken: ReturnType<typeof vi.fn>;
+  };
+  let emailService: { sendGroupCreatedEmail: ReturnType<typeof vi.fn> };
+  let groupEmailThreadService: {
+    findByGroupAndUser: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
   };
 
   const leaderId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -144,6 +152,15 @@ describe('GroupsService', () => {
       resolveGoogleAccessToken: vi.fn().mockResolvedValue('google-access'),
     };
 
+    emailService = {
+      sendGroupCreatedEmail: vi.fn().mockResolvedValue('<created@ntu-study.local>'),
+    };
+
+    groupEmailThreadService = {
+      findByGroupAndUser: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'thread-1', thread_message_id: '<created@ntu-study.local>' }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GroupsService,
@@ -161,6 +178,9 @@ describe('GroupsService', () => {
           provide: GoogleAccessTokenService,
           useValue: googleAccessTokenService,
         },
+        { provide: EmailService, useValue: emailService },
+        { provide: GroupEmailThreadService, useValue: groupEmailThreadService },
+        { provide: ConfigService, useValue: { get: vi.fn().mockReturnValue('http://localhost:5173') } },
       ],
     }).compile();
 
@@ -266,7 +286,9 @@ describe('GroupsService', () => {
       expect(
         googleAccessTokenService.resolveGoogleAccessToken,
       ).toHaveBeenCalledWith(expect.objectContaining({ id: leaderId }));
-      expect(googleCalendarService.createSecondaryCalendar).toHaveBeenCalledWith(
+      expect(
+        googleCalendarService.createSecondaryCalendar,
+      ).toHaveBeenCalledWith(
         'google-access',
         'CalGroup',
         'Shared calendar for this NTU Study group.',
@@ -294,6 +316,48 @@ describe('GroupsService', () => {
         googleCalendarService.createSecondaryCalendar,
       ).not.toHaveBeenCalled();
       expect(result.google_calendar_id).toBeUndefined();
+    });
+
+    it('sends a group-created email to the leader after creation', async () => {
+      await service.create(leaderId, { name: 'ThreadGroup' });
+
+      expect(emailService.sendGroupCreatedEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: mockLeader.email,
+          leaderName: mockLeader.full_name,
+          groupName: 'ThreadGroup',
+        }),
+      );
+    });
+
+    it('stores the returned messageId as the leader thread root', async () => {
+      await service.create(leaderId, { name: 'ThreadGroup' });
+
+      expect(groupEmailThreadService.create).toHaveBeenCalledWith(
+        groupId,
+        leaderId,
+        '<created@ntu-study.local>',
+      );
+    });
+
+    it('skips thread creation when the leader email fails', async () => {
+      emailService.sendGroupCreatedEmail.mockResolvedValueOnce(null);
+
+      await service.create(leaderId, { name: 'FailMail' });
+
+      expect(groupEmailThreadService.create).not.toHaveBeenCalled();
+    });
+
+    it('skips group-created email when leader has notifications disabled', async () => {
+      usersService.findById.mockResolvedValue({
+        ...mockLeader,
+        notification_enabled: false,
+      });
+
+      await service.create(leaderId, { name: 'SilentGroup' });
+
+      expect(emailService.sendGroupCreatedEmail).not.toHaveBeenCalled();
+      expect(groupEmailThreadService.create).not.toHaveBeenCalled();
     });
   });
 
@@ -559,8 +623,12 @@ describe('GroupsService', () => {
         start: startIso,
       });
 
-      expect(googleAccessTokenService.resolveGoogleAccessToken).toHaveBeenCalled();
-      expect(googleCalendarService.createEventWithMeetLink).toHaveBeenCalledWith(
+      expect(
+        googleAccessTokenService.resolveGoogleAccessToken,
+      ).toHaveBeenCalled();
+      expect(
+        googleCalendarService.createEventWithMeetLink,
+      ).toHaveBeenCalledWith(
         'google-access',
         expect.objectContaining({
           summary: 'My Group — NTU Study',
@@ -570,7 +638,9 @@ describe('GroupsService', () => {
       const calArg = googleCalendarService.createEventWithMeetLink.mock
         .calls[0][1] as { start: Date; end: Date };
       expect(calArg.start.toISOString()).toBe(startIso);
-      expect(calArg.end.getTime() - calArg.start.getTime()).toBe(60 * 60 * 1000);
+      expect(calArg.end.getTime() - calArg.start.getTime()).toBe(
+        60 * 60 * 1000,
+      );
       expect(result.meet_link).toContain('meet.google.com');
     });
   });
@@ -702,7 +772,9 @@ describe('GroupsService', () => {
         address_detail: 'L2',
       });
 
-      expect(googleCalendarService.createGroupCalendarEvent).toHaveBeenCalledWith(
+      expect(
+        googleCalendarService.createGroupCalendarEvent,
+      ).toHaveBeenCalledWith(
         'google-access',
         expect.objectContaining({
           calendarId: 'cal@x',

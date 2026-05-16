@@ -204,7 +204,9 @@ export class GoogleDriveController {
           name: f.name ?? '',
           mimeType: f.mimeType ?? '',
           type:
-            f.mimeType === FOLDER_MIME ? ('folder' as const) : ('file' as const),
+            f.mimeType === FOLDER_MIME
+              ? ('folder' as const)
+              : ('file' as const),
           webViewLink: f.webViewLink,
           modifiedTime: f.modifiedTime,
           lastModifiedBy: display,

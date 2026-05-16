@@ -54,7 +54,9 @@ export class TasksController {
   }
 
   @Get()
-  @ApiOperation({ summary: "Get current user's personal tasks or a group's tasks" })
+  @ApiOperation({
+    summary: "Get current user's personal tasks or a group's tasks",
+  })
   @ApiQuery({
     name: 'status',
     required: false,
@@ -69,7 +71,8 @@ export class TasksController {
   @ApiQuery({
     name: 'assignedInGroups',
     required: false,
-    description: "When 'true', returns root group tasks assigned to or created by the user",
+    description:
+      "When 'true', returns root group tasks assigned to or created by the user",
   })
   @ApiResponse({
     status: 200,
@@ -106,9 +109,7 @@ export class TasksController {
   @ApiResponse({ status: 404, description: 'Task not found' })
   findOne(@Req() req: Request, @Param('id') id: string) {
     const user = req.user as JwtRequestUser;
-    return this.tasksService
-      .findOne(id, user.id)
-      .then(serializeTaskForApi);
+    return this.tasksService.findOne(id, user.id).then(serializeTaskForApi);
   }
 
   @Patch(':id')
@@ -140,9 +141,7 @@ export class TasksController {
     @Body() _submitTaskDto: SubmitTaskDto,
   ) {
     const user = req.user as JwtRequestUser;
-    return this.tasksService
-      .submitTask(id, user.id)
-      .then(serializeTaskForApi);
+    return this.tasksService.submitTask(id, user.id).then(serializeTaskForApi);
   }
 
   @Patch(':id/approve')

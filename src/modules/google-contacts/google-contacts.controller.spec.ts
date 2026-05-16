@@ -15,9 +15,7 @@ describe('GoogleContactsController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GoogleContactsController],
-      providers: [
-        { provide: GoogleContactsService, useValue: service },
-      ],
+      providers: [{ provide: GoogleContactsService, useValue: service }],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({ canActivate: () => true })

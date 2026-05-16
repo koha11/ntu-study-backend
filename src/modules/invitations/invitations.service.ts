@@ -15,6 +15,7 @@ import { GroupMember } from '@modules/groups/entities/group-member.entity';
 import { User } from '@modules/users/entities/user.entity';
 import { UsersService } from '@modules/users/users.service';
 import { EmailService } from '@common/services/email.service';
+import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 import { GoogleDriveService } from '@common/services/google-drive.service';
 import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
 import { InvitationStatus } from '@common/enums';
@@ -64,6 +65,7 @@ export class InvitationsService {
     private readonly googleDriveService: GoogleDriveService,
     private readonly googleAccessTokenService: GoogleAccessTokenService,
     private readonly notificationsService: NotificationsService,
+    private readonly groupEmailThreadService: GroupEmailThreadService,
   ) {}
 
   async createInvitation(
@@ -75,7 +77,7 @@ export class InvitationsService {
         params,
       );
     const normalized = params.email.trim().toLowerCase();
-    await this.sendInvitationEmail(saved, group, normalized);
+    await this.sendInvitationEmail(saved, group, normalized, existingInviteeId);
     if (existingInviteeId) {
       await this.notifyExistingUserOfInvitation(
         saved,
@@ -182,6 +184,7 @@ export class InvitationsService {
     saved: GroupInvitation,
     group: Group,
     normalizedEmail: string,
+    existingInviteeId?: string,
   ): Promise<void> {
     const inviter = await this.usersService.findOne(saved.invited_by_id);
     const baseUrl =
@@ -190,12 +193,19 @@ export class InvitationsService {
     const invitationLink = `${baseUrl}/invitations/${saved.token}/accept`;
 
     if (inviter) {
-      await this.emailService.sendGroupInvitation(
+      const messageId = await this.emailService.sendGroupInvitation(
         normalizedEmail,
         inviter.full_name,
         group.name,
         invitationLink,
       );
+      if (messageId && existingInviteeId) {
+        await this.groupEmailThreadService.create(
+          saved.group_id,
+          existingInviteeId,
+          messageId,
+        );
+      }
     }
   }
 
@@ -257,7 +267,7 @@ export class InvitationsService {
       );
 
     const normalized = saved.email?.trim().toLowerCase() ?? '';
-    await this.sendInvitationEmail(saved, group, normalized);
+    await this.sendInvitationEmail(saved, group, normalized, existingInviteeId);
     if (existingInviteeId) {
       await this.notifyExistingUserOfInvitation(
         saved,

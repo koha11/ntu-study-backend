@@ -27,6 +27,7 @@ import {
   CompleteStudyDto,
   UpdateFlashcardSetDto,
   UpdateFlashcardDto,
+  ShareFlashcardSetDto,
 } from './dto/flashcard.dto';
 import {
   serializeFlashcardSetForApi,
@@ -62,6 +63,17 @@ export class FlashcardsController {
       .then((sets) =>
         sets.map((s) => serializeFlashcardSetForApi(s, { omitCards: true })),
       );
+  }
+
+  @Get('groups/:groupId/shared')
+  @ApiOperation({ summary: 'List flashcard sets shared with a group' })
+  @ApiResponse({ status: 200, description: 'Shared flashcard sets' })
+  getGroupSharedSets(
+    @Req() req: Request,
+    @Param('groupId') groupId: string,
+  ) {
+    const user = req.user as JwtRequestUser;
+    return this.flashcardsService.getGroupSharedSets(user.id, groupId);
   }
 
   @Post(':id/study/complete')
@@ -161,5 +173,34 @@ export class FlashcardsController {
   async deleteSet(@Req() req: Request, @Param('id') id: string) {
     const user = req.user as JwtRequestUser;
     await this.flashcardsService.deleteSet(user.id, id);
+  }
+
+  @Post(':id/share')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Share a flashcard set with a group' })
+  @ApiResponse({ status: 201, description: 'Shared' })
+  @ApiResponse({ status: 409, description: 'Already shared' })
+  shareSet(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() dto: ShareFlashcardSetDto,
+  ) {
+    const user = req.user as JwtRequestUser;
+    return this.flashcardsService
+      .shareSetWithGroup(user.id, id, dto.group_id)
+      .then((r) => ({ share_id: r.id, set_id: r.set_id, group_id: r.group_id, shared_at: r.created_at }));
+  }
+
+  @Delete(':id/share/:groupId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Unshare a flashcard set from a group' })
+  @ApiResponse({ status: 204, description: 'Unshared' })
+  async unshareSet(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Param('groupId') groupId: string,
+  ) {
+    const user = req.user as JwtRequestUser;
+    await this.flashcardsService.unshareSetFromGroup(user.id, id, groupId);
   }
 }

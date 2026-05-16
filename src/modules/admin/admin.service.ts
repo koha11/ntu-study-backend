@@ -87,10 +87,7 @@ export class AdminService {
     const trimmed = q?.trim();
     if (trimmed) {
       const term = `%${trimmed}%`;
-      qb.andWhere(
-        '(u.email ILIKE :term OR u.full_name ILIKE :term)',
-        { term },
-      );
+      qb.andWhere('(u.email ILIKE :term OR u.full_name ILIKE :term)', { term });
     }
 
     const [users, total] = await qb.getManyAndCount();

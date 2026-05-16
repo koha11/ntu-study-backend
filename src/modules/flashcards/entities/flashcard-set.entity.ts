@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, OneToMany, Index, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  Index,
+  JoinColumn,
+} from 'typeorm';
 import { BaseEntity } from '@common/entities/base.entity';
 import { User } from '@modules/users/entities/user.entity';
 import { Flashcard } from './flashcard.entity';

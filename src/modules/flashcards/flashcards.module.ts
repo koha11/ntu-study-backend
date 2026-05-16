@@ -6,6 +6,7 @@ import { FlashcardSet } from './entities/flashcard-set.entity';
 import { Flashcard } from './entities/flashcard.entity';
 import { FlashcardStudyLog } from './entities/flashcard-study-log.entity';
 import { SharedGroupFlashcard } from './entities/shared-group-flashcard.entity';
+import { GroupMember } from '@modules/groups/entities/group-member.entity';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { SharedGroupFlashcard } from './entities/shared-group-flashcard.entity';
       Flashcard,
       FlashcardStudyLog,
       SharedGroupFlashcard,
+      GroupMember,
     ]),
   ],
   controllers: [FlashcardsController],

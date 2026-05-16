@@ -37,7 +37,9 @@ describe('GoogleAccessTokenService', () => {
   });
 
   it('returns existing access token when fresh', async () => {
-    const future = new Date(Date.now() + GOOGLE_TOKEN_EXPIRY_BUFFER_MS + 60_000);
+    const future = new Date(
+      Date.now() + GOOGLE_TOKEN_EXPIRY_BUFFER_MS + 60_000,
+    );
     const user = {
       id: 'u1',
       google_access_token: 'access',
@@ -86,7 +88,9 @@ describe('GoogleAccessTokenService', () => {
       token_expires_at: soon,
     } as User;
 
-    googleTokenExchange.refreshAccessToken.mockRejectedValue(new Error('network'));
+    googleTokenExchange.refreshAccessToken.mockRejectedValue(
+      new Error('network'),
+    );
 
     await expect(service.resolveGoogleAccessToken(user)).resolves.toBeNull();
   });

@@ -9,12 +9,16 @@ import { dataSourceOptions } from './data-source';
       inject: [ConfigService],
       useFactory: (configService: ConfigService): TypeOrmModuleOptions => {
         const useSsl = configService.get<boolean>('DB_SSL') === true;
-        const { ssl: _s, extra: _e, entities: _entityGlob, ...rest } =
-          dataSourceOptions as TypeOrmModuleOptions & {
-            ssl?: unknown;
-            extra?: unknown;
-            entities?: unknown;
-          };
+        const {
+          ssl: _s,
+          extra: _e,
+          entities: _entityGlob,
+          ...rest
+        } = dataSourceOptions as TypeOrmModuleOptions & {
+          ssl?: unknown;
+          extra?: unknown;
+          entities?: unknown;
+        };
         return {
           ...rest,
           // Glob-based entity paths are unreliable on Windows; load entities from

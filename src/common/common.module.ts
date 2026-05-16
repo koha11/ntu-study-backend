@@ -4,24 +4,30 @@ import { EmailService } from './services/email.service';
 import { GoogleDriveService } from './services/google-drive.service';
 import { GoogleCalendarService } from './services/google-calendar.service';
 import { TaskSchedulerService } from './services/task-scheduler.service';
+import { GroupEmailThreadService } from './services/group-email-thread.service';
+import { GroupEmailThread } from './entities/group-email-thread.entity';
 import { Task } from '../modules/tasks/entities/task.entity';
 import { User } from '../modules/users/entities/user.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
 import { CronJobRun } from '../modules/cron-jobs/entities/cron-job-run.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Task, User, Notification, CronJobRun])],
+  imports: [
+    TypeOrmModule.forFeature([Task, User, Notification, CronJobRun, GroupEmailThread]),
+  ],
   providers: [
     EmailService,
     GoogleDriveService,
     GoogleCalendarService,
     TaskSchedulerService,
+    GroupEmailThreadService,
   ],
   exports: [
     EmailService,
     GoogleDriveService,
     GoogleCalendarService,
     TaskSchedulerService,
+    GroupEmailThreadService,
   ],
 })
 export class CommonModule {}

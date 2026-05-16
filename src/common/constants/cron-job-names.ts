@@ -4,5 +4,4 @@ export const CRON_JOB_NAMES = {
   CLEANUP_OLD_NOTIFICATIONS: 'notification-cleanup',
 } as const;
 
-export type CronJobName =
-  (typeof CRON_JOB_NAMES)[keyof typeof CRON_JOB_NAMES];
+export type CronJobName = (typeof CRON_JOB_NAMES)[keyof typeof CRON_JOB_NAMES];

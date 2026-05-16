@@ -53,12 +53,18 @@ export class UsersService {
 
   async findDriveQuotaByUserId(
     id: string,
-  ): Promise<
-    Pick<User, 'drive_total_quota' | 'drive_used_quota' | 'quota_last_updated'> | null
-  > {
+  ): Promise<Pick<
+    User,
+    'drive_total_quota' | 'drive_used_quota' | 'quota_last_updated'
+  > | null> {
     return this.usersRepository.findOne({
       where: { id },
-      select: ['id', 'drive_total_quota', 'drive_used_quota', 'quota_last_updated'],
+      select: [
+        'id',
+        'drive_total_quota',
+        'drive_used_quota',
+        'quota_last_updated',
+      ],
     });
   }
 
@@ -88,7 +94,10 @@ export class UsersService {
   }
 
   /** Reserved for opaque refresh-token storage if added later; revocation uses `refresh_token_version`. */
-  async updateRefreshToken(_id: string, _hashedToken: string | null): Promise<void> {
+  async updateRefreshToken(
+    _id: string,
+    _hashedToken: string | null,
+  ): Promise<void> {
     return Promise.resolve();
   }
 

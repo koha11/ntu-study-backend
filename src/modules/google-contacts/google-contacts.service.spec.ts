@@ -79,16 +79,16 @@ describe('personToContact', () => {
 describe('contactMatchesQuery', () => {
   it('returns false for blank query', () => {
     expect(
-      contactMatchesQuery(
-        { email: 'a@b.com', display_name: 'X' },
-        '   ',
-      ),
+      contactMatchesQuery({ email: 'a@b.com', display_name: 'X' }, '   '),
     ).toBe(false);
   });
 
   it('matches email substring case-insensitively', () => {
     expect(
-      contactMatchesQuery({ email: 'User@NTU.edu.vn', display_name: null }, 'ntu'),
+      contactMatchesQuery(
+        { email: 'User@NTU.edu.vn', display_name: null },
+        'ntu',
+      ),
     ).toBe(true);
   });
 
@@ -104,7 +104,10 @@ describe('contactMatchesQuery', () => {
 
 describe('GoogleContactsService', () => {
   let service: GoogleContactsService;
-  let usersService: { findById: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+  let usersService: {
+    findById: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
   let googleTokenExchange: { refreshAccessToken: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {

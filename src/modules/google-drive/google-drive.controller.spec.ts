@@ -41,8 +41,9 @@ describe('GoogleDriveController', () => {
       queryFolderActivity: vi.fn(),
     };
     googleAccessTokenService = {
-      resolveGoogleAccessToken: vi.fn(async (user: { google_access_token?: string }) =>
-        user?.google_access_token ?? null,
+      resolveGoogleAccessToken: vi.fn(
+        async (user: { google_access_token?: string }) =>
+          user?.google_access_token ?? null,
       ),
     };
 

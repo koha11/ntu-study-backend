@@ -150,7 +150,8 @@ export class AuthService {
     if (tokenRv !== user.refresh_token_version) {
       throw new UnauthorizedException('Refresh token revoked');
     }
-    const { accessToken, refreshToken: newRefresh } = await this.getTokens(user);
+    const { accessToken, refreshToken: newRefresh } =
+      await this.getTokens(user);
     return { access_token: accessToken, refresh_token: newRefresh };
   }
 }

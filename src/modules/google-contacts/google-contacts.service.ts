@@ -41,8 +41,7 @@ export function personToContact(
   const photos = person.photos;
   let photoUrl: string | null = null;
   if (photos?.length) {
-    const best =
-      photos.find((p) => p.metadata?.primary) ?? photos[0];
+    const best = photos.find((p) => p.metadata?.primary) ?? photos[0];
     photoUrl = best?.url?.trim() || null;
   }
   return { email: value, display_name: name, photo_url: photoUrl };

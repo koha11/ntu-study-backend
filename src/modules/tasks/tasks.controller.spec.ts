@@ -49,9 +49,12 @@ describe('TasksController', () => {
   it('create forwards jwt user id and dto', async () => {
     tasksService.create.mockResolvedValue({ id: 't1' });
 
-    await controller.create({ user: { id: userId } } as never, {
-      title: 'Hello',
-    } as never);
+    await controller.create(
+      { user: { id: userId } } as never,
+      {
+        title: 'Hello',
+      } as never,
+    );
 
     expect(tasksService.create).toHaveBeenCalledWith(userId, {
       title: 'Hello',
@@ -146,11 +149,9 @@ describe('TasksController', () => {
       subtasks: [],
     } as Task);
 
-    await controller.update(
-      { user: { id: userId } } as never,
-      'tid',
-      { title: 'X' } as never,
-    );
+    await controller.update({ user: { id: userId } } as never, 'tid', {
+      title: 'X',
+    } as never);
 
     expect(tasksService.update).toHaveBeenCalledWith('tid', userId, {
       title: 'X',
@@ -184,11 +185,9 @@ describe('TasksController', () => {
       subtasks: [],
     } as Task);
 
-    await controller.approveTask(
-      { user: { id: userId } } as never,
-      'tid',
-      { status: TaskStatus.DONE } as never,
-    );
+    await controller.approveTask({ user: { id: userId } } as never, 'tid', {
+      status: TaskStatus.DONE,
+    } as never);
 
     expect(tasksService.approveTask).toHaveBeenCalledWith(
       'tid',

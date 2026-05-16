@@ -77,9 +77,10 @@ describe('AuthService', () => {
             `signed-${typeof payload === 'object' && payload && 'sub' in payload ? (payload as { sub: string }).sub : 'x'}`,
           ),
         ),
-      verify: vi
-        .fn()
-        .mockReturnValue({ sub: mockUser.id, rv: mockUser.refresh_token_version }),
+      verify: vi.fn().mockReturnValue({
+        sub: mockUser.id,
+        rv: mockUser.refresh_token_version,
+      }),
     };
 
     configService = {

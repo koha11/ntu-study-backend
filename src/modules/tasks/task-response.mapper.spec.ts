@@ -85,11 +85,11 @@ describe('serializeTaskForApi', () => {
     const json = serializeTaskForApi(root);
     const subs = json.subtasks as Record<string, unknown>[];
     expect(subs).toHaveLength(1);
-    expect(subs[0]!.assignee).toEqual({
+    expect(subs[0].assignee).toEqual({
       id: 'u2',
       full_name: 'Sub Owner',
       avatar_url: null,
     });
-    expect(subs[0]!.parent_task).toEqual({ id: 'p1', title: 'Parent title' });
+    expect(subs[0].parent_task).toEqual({ id: 'p1', title: 'Parent title' });
   });
 });

@@ -19,8 +19,12 @@ import { GoogleDriveService } from '@common/services/google-drive.service';
 import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
 import { DataSource } from 'typeorm';
 import { InvitationStatus, UserRole } from '@common/enums';
-import { NOTIFICATION_TYPE, RELATED_ENTITY_TYPE } from '@common/constants/notification-types';
+import {
+  NOTIFICATION_TYPE,
+  RELATED_ENTITY_TYPE,
+} from '@common/constants/notification-types';
 import { NotificationsService } from '@modules/notifications/notifications.service';
+import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 
 describe('InvitationsService', () => {
   let service: InvitationsService;
@@ -45,6 +49,11 @@ describe('InvitationsService', () => {
     create: ReturnType<typeof vi.fn>;
   };
   let emailService: { sendGroupInvitation: ReturnType<typeof vi.fn> };
+  let groupEmailThreadService: {
+    findByGroupAndUser: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+  };
+  const inviteeUserId = 'uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu';
   let configService: { get: ReturnType<typeof vi.fn> };
   let googleDriveService: { shareFile: ReturnType<typeof vi.fn> };
   let googleAccessTokenService: {
@@ -110,7 +119,12 @@ describe('InvitationsService', () => {
     };
 
     emailService = {
-      sendGroupInvitation: vi.fn().mockResolvedValue(true),
+      sendGroupInvitation: vi.fn().mockResolvedValue('<inv@ntu-study.local>'),
+    };
+
+    groupEmailThreadService = {
+      findByGroupAndUser: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'thread-1', thread_message_id: '<inv@ntu-study.local>' }),
     };
 
     configService = {
@@ -131,8 +145,9 @@ describe('InvitationsService', () => {
 
     dataSource = {
       transaction: vi.fn(
-        <T,>(fn: (m: { getRepository: typeof managerGetRepository }) => Promise<T>) =>
-          fn({ getRepository: managerGetRepository } as never),
+        <T>(
+          fn: (m: { getRepository: typeof managerGetRepository }) => Promise<T>,
+        ) => fn({ getRepository: managerGetRepository } as never),
       ),
     };
 
@@ -158,6 +173,7 @@ describe('InvitationsService', () => {
           useValue: googleAccessTokenService,
         },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: GroupEmailThreadService, useValue: groupEmailThreadService },
       ],
     }).compile();
 
@@ -247,6 +263,45 @@ describe('InvitationsService', () => {
       });
 
       expect(notificationsService.createNotification).not.toHaveBeenCalled();
+    });
+
+    it('creates a thread for the invitee when they are an existing user and email succeeds', async () => {
+      const existingInvitee = { id: inviteeUserId, email };
+      groupsRepository.findOne.mockResolvedValue(group as Group);
+      usersService.findByEmail.mockResolvedValue(existingInvitee as User);
+      membersRepository.findOne.mockResolvedValue(null);
+      invitationsRepository.findOne.mockResolvedValue(null);
+
+      await service.createInvitation({ groupId, invitedByUserId: leaderId, email });
+
+      expect(groupEmailThreadService.create).toHaveBeenCalledWith(
+        groupId,
+        inviteeUserId,
+        '<inv@ntu-study.local>',
+      );
+    });
+
+    it('does not create a thread when the invitee is a new (unregistered) user', async () => {
+      groupsRepository.findOne.mockResolvedValue(group as Group);
+      usersService.findByEmail.mockResolvedValue(null);
+      invitationsRepository.findOne.mockResolvedValue(null);
+
+      await service.createInvitation({ groupId, invitedByUserId: leaderId, email });
+
+      expect(groupEmailThreadService.create).not.toHaveBeenCalled();
+    });
+
+    it('does not create a thread when the invitation email fails', async () => {
+      const existingInvitee = { id: inviteeUserId, email };
+      groupsRepository.findOne.mockResolvedValue(group as Group);
+      usersService.findByEmail.mockResolvedValue(existingInvitee as User);
+      membersRepository.findOne.mockResolvedValue(null);
+      invitationsRepository.findOne.mockResolvedValue(null);
+      emailService.sendGroupInvitation.mockResolvedValueOnce(null);
+
+      await service.createInvitation({ groupId, invitedByUserId: leaderId, email });
+
+      expect(groupEmailThreadService.create).not.toHaveBeenCalled();
     });
   });
 
@@ -534,23 +589,25 @@ describe('InvitationsService', () => {
 
   describe('resendGroupInvitation', () => {
     function stubInvitationLookup(existing: Partial<GroupInvitation>) {
-      invitationsRepository.findOne.mockImplementation(async (opts: { where?: Record<string, unknown> }) => {
-        const w = opts?.where ?? {};
-        if (w.id === invitationId && w.group_id === groupId) {
-          return existing as GroupInvitation;
-        }
-        if (
-          w.group_id === groupId &&
-          w.email === email &&
-          w.status === InvitationStatus.PENDING
-        ) {
+      invitationsRepository.findOne.mockImplementation(
+        async (opts: { where?: Record<string, unknown> }) => {
+          const w = opts?.where ?? {};
+          if (w.id === invitationId && w.group_id === groupId) {
+            return existing as GroupInvitation;
+          }
+          if (
+            w.group_id === groupId &&
+            w.email === email &&
+            w.status === InvitationStatus.PENDING
+          ) {
+            return null;
+          }
+          if (typeof w.token === 'string') {
+            return null;
+          }
           return null;
-        }
-        if (typeof w.token === 'string') {
-          return null;
-        }
-        return null;
-      });
+        },
+      );
     }
 
     it('expires pending invitation and creates a new pending invitation', async () => {
@@ -605,7 +662,10 @@ describe('InvitationsService', () => {
 
       expect(result.status).toBe(InvitationStatus.PENDING);
       expect(invitationsRepository.save).not.toHaveBeenCalledWith(
-        expect.objectContaining({ id: invitationId, status: InvitationStatus.EXPIRED }),
+        expect.objectContaining({
+          id: invitationId,
+          status: InvitationStatus.EXPIRED,
+        }),
       );
       expect(emailService.sendGroupInvitation).toHaveBeenCalled();
     });
