@@ -16,6 +16,7 @@ import {
 import { EmailService } from '@common/services/email.service';
 import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 import { ConfigService } from '@nestjs/config';
+import { NotificationsService } from '@modules/notifications/notifications.service';
 
 describe('ContributionsService', () => {
   let service: ContributionsService;
@@ -30,8 +31,12 @@ describe('ContributionsService', () => {
   let membersRepository: { find: ReturnType<typeof vi.fn>; findOne: ReturnType<typeof vi.fn> };
   let tasksRepository: { find: ReturnType<typeof vi.fn> };
   let usersRepository: { find: ReturnType<typeof vi.fn> };
-  let emailService: { sendContributionOpenEmail: ReturnType<typeof vi.fn> };
+  let emailService: {
+    sendContributionOpenEmail: ReturnType<typeof vi.fn>;
+    sendContributionClosedEmail: ReturnType<typeof vi.fn>;
+  };
   let groupEmailThreadService: { findByGroupAndUser: ReturnType<typeof vi.fn> };
+  let notificationsService: { createNotification: ReturnType<typeof vi.fn> };
 
   const qbChain = {
     select: function () { return this; },
@@ -66,8 +71,12 @@ describe('ContributionsService', () => {
     };
     tasksRepository = { find: vi.fn().mockResolvedValue([]) };
     usersRepository = { find: vi.fn().mockResolvedValue([]) };
-    emailService = { sendContributionOpenEmail: vi.fn().mockResolvedValue('<contrib@ntu-study.local>') };
+    emailService = {
+      sendContributionOpenEmail: vi.fn().mockResolvedValue('<contrib@ntu-study.local>'),
+      sendContributionClosedEmail: vi.fn().mockResolvedValue('<closed@ntu-study.local>'),
+    };
     groupEmailThreadService = { findByGroupAndUser: vi.fn().mockResolvedValue(null) };
+    notificationsService = { createNotification: vi.fn().mockResolvedValue({}) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -80,6 +89,7 @@ describe('ContributionsService', () => {
         { provide: EmailService, useValue: emailService },
         { provide: GroupEmailThreadService, useValue: groupEmailThreadService },
         { provide: ConfigService, useValue: { get: vi.fn().mockReturnValue('http://localhost:5173') } },
+        { provide: NotificationsService, useValue: notificationsService },
       ],
     }).compile();
 
@@ -163,6 +173,70 @@ describe('ContributionsService', () => {
       await service.openEvaluation(groupId, leaderId, futureDue);
 
       expect(emailService.sendContributionOpenEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('closeEvaluation — notifications', () => {
+    const roundStartedAt = new Date('2026-04-01T00:00:00.000Z');
+    const activeGroup = { id: groupId, name: 'Test Group', leader_id: leaderId };
+    const memberUser = {
+      id: memberId,
+      email: 'member@test.com',
+      full_name: 'Member',
+      notification_enabled: true,
+      preferred_language: 'vi',
+    };
+
+    beforeEach(() => {
+      groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
+      membersRepository.find.mockResolvedValue([
+        { user_id: memberId, is_active: true } as GroupMember,
+      ]);
+    });
+
+    it('creates in-app notification and sends email to members with scored tasks', async () => {
+      qbChain.execute.mockResolvedValueOnce({ affected: 1 });
+      qbChain.getRawMany.mockResolvedValueOnce([
+        { task_id: 'task-1', task_title: 'Task One', average_score: '8.50' },
+      ]);
+      usersRepository.find.mockResolvedValue([memberUser] as User[]);
+
+      await service.closeEvaluation(groupId, leaderId, roundStartedAt);
+
+      expect(notificationsService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ recipient_id: memberId, type: 'evaluation_closed' }),
+      );
+      expect(emailService.sendContributionClosedEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ toEmail: 'member@test.com', overallAverage: 8.5 }),
+      );
+    });
+
+    it('skips members with no scored tasks', async () => {
+      qbChain.execute.mockResolvedValueOnce({ affected: 1 });
+      qbChain.getRawMany.mockResolvedValueOnce([]);
+      usersRepository.find.mockResolvedValue([memberUser] as User[]);
+
+      await service.closeEvaluation(groupId, leaderId, roundStartedAt);
+
+      expect(notificationsService.createNotification).not.toHaveBeenCalled();
+      expect(emailService.sendContributionClosedEmail).not.toHaveBeenCalled();
+    });
+
+    it('creates in-app notification but skips email when notifications disabled', async () => {
+      qbChain.execute.mockResolvedValueOnce({ affected: 1 });
+      qbChain.getRawMany.mockResolvedValueOnce([
+        { task_id: 'task-1', task_title: 'Task One', average_score: '7.00' },
+      ]);
+      usersRepository.find.mockResolvedValue([
+        { ...memberUser, notification_enabled: false },
+      ] as User[]);
+
+      await service.closeEvaluation(groupId, leaderId, roundStartedAt);
+
+      expect(notificationsService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ recipient_id: memberId }),
+      );
+      expect(emailService.sendContributionClosedEmail).not.toHaveBeenCalled();
     });
   });
 

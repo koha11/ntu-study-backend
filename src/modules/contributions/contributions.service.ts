@@ -12,9 +12,14 @@ import { Group } from '@modules/groups/entities/group.entity';
 import { GroupMember } from '@modules/groups/entities/group-member.entity';
 import { Task } from '@modules/tasks/entities/task.entity';
 import { User } from '@modules/users/entities/user.entity';
-import { TaskStatus } from '@common/enums';
+import { Language, NotificationDeliveryChannel, TaskStatus } from '@common/enums';
 import { EmailService } from '@common/services/email.service';
 import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
+import { NotificationsService } from '@modules/notifications/notifications.service';
+import {
+  NOTIFICATION_TYPE,
+  RELATED_ENTITY_TYPE,
+} from '@common/constants/notification-types';
 
 export interface EvaluationRoundRow {
   round_started_at: string;
@@ -37,6 +42,12 @@ export interface AggregatedRatingRow {
   average_score: number | null;
 }
 
+export interface MemberTaskScore {
+  task_id: string;
+  task_title: string;
+  average_score: number | null;
+}
+
 @Injectable()
 export class ContributionsService {
   constructor(
@@ -53,6 +64,7 @@ export class ContributionsService {
     private readonly emailService: EmailService,
     private readonly groupEmailThreadService: GroupEmailThreadService,
     private readonly configService: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   parseRoundStartedAt(param: string): Date {
@@ -216,7 +228,12 @@ export class ContributionsService {
 
     await this.ratingsRepository.save(rows);
 
-    await this.notifyMembersEvaluationOpened(groupId, group, dueDate, activeUserIds);
+    await this.notifyMembersEvaluationOpened(
+      groupId,
+      group,
+      dueDate,
+      activeUserIds,
+    );
 
     return {
       round_started_at: roundStartedAt.toISOString(),
@@ -279,7 +296,120 @@ export class ContributionsService {
       throw new NotFoundException('Evaluation round not found for this group');
     }
 
+    const activeUserIds = await this.getActiveMemberUserIds(groupId);
+    await this.notifyMembersEvaluationClosed(
+      groupId,
+      group,
+      roundStartedAt,
+      activeUserIds,
+    );
+
     return { updated: result.affected };
+  }
+
+  private async getMemberTaskScores(
+    groupId: string,
+    roundStartedAt: Date,
+    memberId: string,
+  ): Promise<MemberTaskScore[]> {
+    const raw = await this.ratingsRepository
+      .createQueryBuilder('cr')
+      .innerJoin('cr.task', 'task')
+      .select('task.id', 'task_id')
+      .addSelect('task.title', 'task_title')
+      .addSelect('ROUND(AVG(cr.score)::numeric, 2)', 'average_score')
+      .where('cr.group_id = :groupId', { groupId })
+      .andWhere('cr.round_started_at = :roundStartedAt', { roundStartedAt })
+      .andWhere('task.assignee_id = :memberId', { memberId })
+      .andWhere('cr.score IS NOT NULL')
+      .groupBy('task.id')
+      .addGroupBy('task.title')
+      .orderBy('task.title', 'ASC')
+      .getRawMany<{
+        task_id: string;
+        task_title: string;
+        average_score: string | null;
+      }>();
+
+    return raw.map((r) => ({
+      task_id: r.task_id,
+      task_title: r.task_title,
+      average_score:
+        r.average_score !== null ? parseFloat(r.average_score) : null,
+    }));
+  }
+
+  private async notifyMembersEvaluationClosed(
+    groupId: string,
+    group: Group,
+    roundStartedAt: Date,
+    activeUserIds: string[],
+  ): Promise<void> {
+    const base =
+      this.configService.get<string>('FRONTEND_URL')?.replace(/\/$/, '') ??
+      'http://localhost:5173';
+    const groupUrl = `${base}/groups/${groupId}`;
+
+    const users = await this.usersRepository.find({
+      where: { id: In(activeUserIds) },
+    });
+
+    for (const user of users) {
+      const taskScores = await this.getMemberTaskScores(
+        groupId,
+        roundStartedAt,
+        user.id,
+      );
+      if (taskScores.length === 0) {
+        continue;
+      }
+
+      const scored = taskScores.filter((t) => t.average_score !== null);
+      const overallAverage =
+        scored.length > 0
+          ? Math.round(
+              (scored.reduce((sum, t) => sum + (t.average_score as number), 0) /
+                scored.length) *
+                100,
+            ) / 100
+          : null;
+
+      const vi = user.preferred_language !== Language.EN;
+      const scoreLabel = overallAverage !== null ? `${overallAverage}/10` : '—';
+      const message = vi
+        ? `Vòng đánh giá đóng góp của nhóm "${group.name}" đã kết thúc. Điểm tổng của bạn: ${scoreLabel}.`
+        : `Peer evaluation for group "${group.name}" has closed. Your overall score: ${scoreLabel}.`;
+
+      await this.notificationsService.createNotification({
+        recipient_id: user.id,
+        type: NOTIFICATION_TYPE.EVALUATION_CLOSED,
+        message,
+        related_entity_type: RELATED_ENTITY_TYPE.CONTRIBUTION_EVALUATION,
+        related_entity_id: groupId,
+        delivery_channel: NotificationDeliveryChannel.BOTH,
+      });
+
+      if (user.notification_enabled === false) {
+        continue;
+      }
+
+      const thread = await this.groupEmailThreadService.findByGroupAndUser(
+        groupId,
+        user.id,
+      );
+      await this.emailService.sendContributionClosedEmail({
+        toEmail: user.email,
+        groupName: group.name,
+        taskScores: taskScores.map((t) => ({
+          taskTitle: t.task_title,
+          averageScore: t.average_score,
+        })),
+        overallAverage,
+        groupUrl,
+        threadMessageId: thread?.thread_message_id,
+        lang: user.preferred_language,
+      });
+    }
   }
 
   async listRounds(

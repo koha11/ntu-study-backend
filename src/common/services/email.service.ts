@@ -367,6 +367,69 @@ export class EmailService {
     });
   }
 
+  async sendContributionClosedEmail(params: {
+    toEmail: string;
+    groupName: string;
+    taskScores: { taskTitle: string; averageScore: number | null }[];
+    overallAverage: number | null;
+    groupUrl: string;
+    threadMessageId?: string;
+    lang?: Language;
+  }): Promise<string | null> {
+    const { toEmail, groupName, taskScores, overallAverage, groupUrl, threadMessageId, lang } = params;
+    const vi = lang !== Language.EN;
+    const scoreLabel = overallAverage !== null ? `${overallAverage}/10` : '—';
+    const taskRowsHtml = taskScores
+      .map(
+        (t) =>
+          vi
+            ? `<tr><td>${t.taskTitle}</td><td>${t.averageScore !== null ? `${t.averageScore}/10` : '—'}</td></tr>`
+            : `<tr><td>${t.taskTitle}</td><td>${t.averageScore !== null ? `${t.averageScore}/10` : '—'}</td></tr>`,
+      )
+      .join('');
+    const taskRowsText = taskScores
+      .map(
+        (t) =>
+          vi
+            ? `- ${t.taskTitle}: ${t.averageScore !== null ? `${t.averageScore}/10` : '—'}`
+            : `- ${t.taskTitle}: ${t.averageScore !== null ? `${t.averageScore}/10` : '—'}`,
+      )
+      .join('\n');
+    return this.send({
+      to: toEmail,
+      subject: vi
+        ? `Kết quả đánh giá đóng góp: ${groupName}`
+        : `Peer evaluation results: ${groupName}`,
+      html: vi
+        ? `
+        <h2>Vòng đánh giá đã kết thúc</h2>
+        <p>Vòng đánh giá đóng góp cho nhóm <strong>${groupName}</strong> đã kết thúc.</p>
+        <h3>Điểm của bạn:</h3>
+        <table border="1" cellpadding="6" cellspacing="0">
+          <tr><th>Nhiệm vụ</th><th>Điểm trung bình</th></tr>
+          ${taskRowsHtml}
+        </table>
+        <p><strong>Điểm tổng: ${scoreLabel}</strong></p>
+        <p><a href="${groupUrl}">Đến nhóm</a></p>
+      `
+        : `
+        <h2>Evaluation Round Closed</h2>
+        <p>The peer evaluation round for group <strong>${groupName}</strong> has closed.</p>
+        <h3>Your scores:</h3>
+        <table border="1" cellpadding="6" cellspacing="0">
+          <tr><th>Task</th><th>Average Score</th></tr>
+          ${taskRowsHtml}
+        </table>
+        <p><strong>Overall score: ${scoreLabel}</strong></p>
+        <p><a href="${groupUrl}">Go to group</a></p>
+      `,
+      text: vi
+        ? `Vòng đánh giá đóng góp của nhóm "${groupName}" đã kết thúc.\n\nĐiểm của bạn:\n${taskRowsText}\n\nĐiểm tổng: ${scoreLabel}\n${groupUrl}`
+        : `Peer evaluation for group "${groupName}" has closed.\n\nYour scores:\n${taskRowsText}\n\nOverall score: ${scoreLabel}\n${groupUrl}`,
+      inReplyTo: threadMessageId,
+    });
+  }
+
   /**
    * Sends a single batched reminder listing all overdue tasks for one group.
    * Replaces the old per-task sendTaskReminder for group tasks.

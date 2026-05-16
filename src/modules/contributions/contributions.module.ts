@@ -9,12 +9,14 @@ import { Task } from '@modules/tasks/entities/task.entity';
 import { User } from '@modules/users/entities/user.entity';
 import { AuthModule } from '@modules/auth/auth.module';
 import { CommonModule } from '@common/common.module';
+import { NotificationsModule } from '@modules/notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ContributionRating, Group, GroupMember, Task, User]),
     AuthModule,
     CommonModule,
+    NotificationsModule,
   ],
   controllers: [ContributionsController],
   providers: [ContributionsService],
