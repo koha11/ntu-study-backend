@@ -94,20 +94,22 @@ export class GroupsService {
     await this.membersRepository.save(membership);
 
     const leader = await this.usersService.findById(leaderId, true);
-    if (leader?.google_access_token) {
-      const folderUnknown: unknown = await this.googleDriveService.createFolder(
-        leader.google_access_token,
-        name,
-      );
-      const folderId = this.extractDriveFolderId(folderUnknown);
-      if (folderId) {
-        saved.drive_folder_id = folderId;
-        await this.googleDriveService.createFolder(
-          leader.google_access_token,
-          'canva assets',
-          folderId,
-        );
-        await this.groupsRepository.save(saved);
+    if (leader) {
+      const driveAccess =
+        await this.googleAccessTokenService.resolveGoogleAccessToken(leader);
+      if (driveAccess) {
+        const folderUnknown: unknown =
+          await this.googleDriveService.createFolder(driveAccess, name);
+        const folderId = this.extractDriveFolderId(folderUnknown);
+        if (folderId) {
+          saved.drive_folder_id = folderId;
+          await this.googleDriveService.createFolder(
+            driveAccess,
+            'canva assets',
+            folderId,
+          );
+          await this.groupsRepository.save(saved);
+        }
       }
     }
 
