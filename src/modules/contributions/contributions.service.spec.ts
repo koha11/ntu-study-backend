@@ -174,6 +174,23 @@ describe('ContributionsService', () => {
 
       expect(emailService.sendContributionOpenEmail).not.toHaveBeenCalled();
     });
+
+    it('creates new ratings when all existing ratings are from a closed round', async () => {
+      // Simulate: ratingsRepository.findOne returns null (is_round_closed: false query finds nothing)
+      // meaning the only existing ratings have is_round_closed: true (closed round)
+      ratingsRepository.findOne.mockResolvedValue(null);
+      usersRepository.find.mockResolvedValue([leaderUser, memberUser] as User[]);
+
+      const result = await service.openEvaluation(groupId, leaderId, futureDue);
+
+      // leaderUser can rate the task assigned to memberId → 1 rating row expected
+      expect(result.ratings_created).toBe(1);
+      expect(ratingsRepository.save).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ rater: { id: leaderId } }),
+        ]),
+      );
+    });
   });
 
   describe('closeEvaluation — notifications', () => {

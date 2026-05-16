@@ -13,7 +13,7 @@ import { Group } from '@modules/groups/entities/group.entity';
 import { Task } from '@modules/tasks/entities/task.entity';
 
 @Entity('contribution_ratings')
-@Unique(['task', 'rater'])
+@Unique(['task', 'rater', 'round_started_at'])
 @Check(`("score" IS NULL) OR ("score" >= 0 AND "score" <= 10)`)
 @Index(['group', 'round_started_at'])
 @Index(['group', 'rater', 'round_started_at'])

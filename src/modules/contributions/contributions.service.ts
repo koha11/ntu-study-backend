@@ -199,11 +199,12 @@ export class ContributionsService {
           continue;
         }
 
-        // Check if this rater has already rated this task (globally, not per round)
+        // Skip only if an open rating already exists for this task+rater in this round
         const existingRating = await this.ratingsRepository.findOne({
           where: {
             task: { id: task.id },
             rater: { id: raterId },
+            is_round_closed: false,
           },
         });
 
