@@ -180,36 +180,42 @@ export class ContributionsService {
       );
     }
 
-    const eligibleTasks = await this.getEligibleTasksForEvaluation(groupId);
-    if (eligibleTasks.length === 0) {
+    const allEligibleTasks = await this.getEligibleTasksForEvaluation(groupId);
+    if (allEligibleTasks.length === 0) {
       throw new BadRequestException(
         'No eligible DONE tasks with active assignees found for evaluation',
       );
     }
 
+    // Exclude tasks already included in any previous evaluation round for this group
+    const previouslyEvaluated = await this.ratingsRepository
+      .createQueryBuilder('cr')
+      .innerJoin('cr.task', 'task')
+      .select('task.id', 'taskId')
+      .distinct(true)
+      .where('cr.group_id = :groupId', { groupId })
+      .getRawMany<{ taskId: string }>();
+    const previouslyEvaluatedTaskIds = new Set(
+      previouslyEvaluated.map((r) => r.taskId),
+    );
+
+    const eligibleTasks = allEligibleTasks.filter(
+      (task) => !previouslyEvaluatedTaskIds.has(task.id),
+    );
+
+    if (eligibleTasks.length === 0) {
+      throw new BadRequestException(
+        'All eligible tasks have already been evaluated in a previous round',
+      );
+    }
+
     const roundStartedAt = new Date();
 
-    // For each eligible task, create a rating row for each rater who hasn't rated it yet
-    // Raters = active members who are NOT the task assignee
+    // For each eligible task, create a rating row for each rater (excluding the assignee)
     const rows: ContributionRating[] = [];
     for (const task of eligibleTasks) {
       for (const raterId of activeUserIds) {
         if (raterId === task.assignee_id) {
-          // Assignee cannot rate their own task
-          continue;
-        }
-
-        // Skip only if an open rating already exists for this task+rater in this round
-        const existingRating = await this.ratingsRepository.findOne({
-          where: {
-            task: { id: task.id },
-            rater: { id: raterId },
-            is_round_closed: false,
-          },
-        });
-
-        if (existingRating) {
-          // Skip if already rated
           continue;
         }
 

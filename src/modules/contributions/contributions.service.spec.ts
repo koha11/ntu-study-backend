@@ -41,6 +41,7 @@ describe('ContributionsService', () => {
   const qbChain = {
     select: function () { return this; },
     addSelect: function () { return this; },
+    distinct: function () { return this; },
     where: function () { return this; },
     andWhere: function () { return this; },
     groupBy: function () { return this; },
@@ -175,10 +176,7 @@ describe('ContributionsService', () => {
       expect(emailService.sendContributionOpenEmail).not.toHaveBeenCalled();
     });
 
-    it('creates new ratings when all existing ratings are from a closed round', async () => {
-      // Simulate: ratingsRepository.findOne returns null (is_round_closed: false query finds nothing)
-      // meaning the only existing ratings have is_round_closed: true (closed round)
-      ratingsRepository.findOne.mockResolvedValue(null);
+    it('creates ratings for tasks not yet in any previous round', async () => {
       usersRepository.find.mockResolvedValue([leaderUser, memberUser] as User[]);
 
       const result = await service.openEvaluation(groupId, leaderId, futureDue);
@@ -190,6 +188,16 @@ describe('ContributionsService', () => {
           expect.objectContaining({ rater: { id: leaderId } }),
         ]),
       );
+    });
+
+    it('throws when all eligible tasks were already evaluated in a previous round', async () => {
+      // Simulate the previous-round query returning the only eligible task
+      qbChain.getRawMany.mockResolvedValueOnce([{ taskId: eligibleTask.id }]);
+      usersRepository.find.mockResolvedValue([leaderUser, memberUser] as User[]);
+
+      await expect(
+        service.openEvaluation(groupId, leaderId, futureDue),
+      ).rejects.toThrow('All eligible tasks have already been evaluated in a previous round');
     });
   });
 
