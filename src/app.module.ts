@@ -19,6 +19,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
 import { GoogleContactsModule } from './modules/google-contacts/google-contacts.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 @Module({
   imports: [
     AppConfigModule,
@@ -39,6 +40,7 @@ import { AdminModule } from './modules/admin/admin.module';
     GoogleDriveModule,
     GoogleContactsModule,
     AdminModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

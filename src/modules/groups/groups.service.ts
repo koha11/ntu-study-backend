@@ -154,7 +154,11 @@ export class GroupsService {
         lang: leader.preferred_language,
       });
       if (messageId) {
-        await this.groupEmailThreadService.create(saved.id, leaderId, messageId);
+        await this.groupEmailThreadService.create(
+          saved.id,
+          leaderId,
+          messageId,
+        );
       }
     }
 
