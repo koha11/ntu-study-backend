@@ -58,6 +58,13 @@ export class NotificationsController {
     return this.notificationsService.getUserNotifications(user.id, unreadOnly);
   }
 
+  @Patch('read-all')
+  @ApiOperation({ summary: 'Mark all notifications as read' })
+  @ApiResponse({ status: 200, description: 'All notifications marked as read' })
+  markAllAsRead(@Req() req: Request & { user: JwtRequestUser }) {
+    return this.notificationsService.markAllAsRead(req.user.id);
+  }
+
   @Patch(':id/read')
   @ApiOperation({ summary: 'Mark notification as read' })
   @ApiResponse({ status: 200, description: 'Notification marked as read' })

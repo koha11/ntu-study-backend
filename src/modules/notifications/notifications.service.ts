@@ -45,6 +45,13 @@ export class NotificationsService {
     });
   }
 
+  async markAllAsRead(userId: string): Promise<void> {
+    await this.notificationsRepository.update(
+      { recipient_id: userId, is_read: false },
+      { is_read: true },
+    );
+  }
+
   async markAsRead(id: string, userId: string): Promise<Notification> {
     const notification = await this.notificationsRepository.findOne({
       where: { id },
