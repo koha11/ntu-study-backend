@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 import { Language } from '@common/enums';
 
 export interface EmailOptions {
@@ -19,12 +20,21 @@ export interface EmailOptions {
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private transporter!: Transporter;
+  private readonly isProd: boolean;
 
   constructor(private configService: ConfigService) {
+    this.isProd = configService.get<string>('NODE_ENV') === 'production';
     this.initializeTransporter();
   }
 
   private initializeTransporter() {
+    if (this.isProd) {
+      const apiKey = this.configService.get<string>('SENDGRID_API_KEY', '');
+      sgMail.setApiKey(apiKey);
+      this.logger.log('Email service ready (SendGrid)');
+      return;
+    }
+
     const mailHost = this.configService.get<string>('MAIL_HOST', 'localhost');
     const mailPort = this.configService.get<number>('MAIL_PORT', 1025);
     const mailUser = this.configService.get<string>(
@@ -56,11 +66,59 @@ export class EmailService {
   }
 
   /**
-   * Low-level send. Returns the nodemailer Message-ID on success, null on failure.
+   * Low-level send. Returns a Message-ID on success, null on failure.
    * Callers that started a thread should store this ID; follow-up emails pass it
    * back via options.inReplyTo to keep replies in the same thread.
    */
   async send(options: EmailOptions): Promise<string | null> {
+    return this.isProd
+      ? this.sendViaSendGrid(options)
+      : this.sendViaNodemailer(options);
+  }
+
+  private async sendViaSendGrid(options: EmailOptions): Promise<string | null> {
+    const toStr = Array.isArray(options.to)
+      ? options.to.join(', ')
+      : options.to;
+    try {
+      const from = this.configService.get<string>('SENDGRID_FROM_EMAIL', '');
+      const msg = {
+        to: options.to,
+        from,
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+        ...(options.cc && { cc: options.cc }),
+        ...(options.bcc && { bcc: options.bcc }),
+        ...(options.inReplyTo && {
+          headers: {
+            'In-Reply-To': options.inReplyTo,
+            References: options.inReplyTo,
+          },
+        }),
+      } as sgMail.MailDataRequired;
+
+      const [response] = await sgMail.send(msg);
+      const headers = response.headers as Record<string, string | string[]>;
+      const rawId = headers['x-message-id'];
+      const messageId = Array.isArray(rawId) ? rawId[0] : rawId;
+      this.logger.log(
+        `Email sent via SendGrid (${response.statusCode}) to ${toStr}`,
+      );
+      return messageId ?? null;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to send email via SendGrid to ${toStr}: ${errorMessage}`,
+      );
+      return null;
+    }
+  }
+
+  private async sendViaNodemailer(
+    options: EmailOptions,
+  ): Promise<string | null> {
     try {
       const mailFrom = this.configService.get<string>(
         'MAIL_FROM',
