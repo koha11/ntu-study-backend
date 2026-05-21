@@ -7,7 +7,8 @@ const CANVA_TOKEN_URL = 'https://api.canva.com/rest/v1/oauth/token';
 const CANVA_API_BASE = 'https://api.canva.com/rest/v1';
 
 /** Scopes configured in Canva Developer Portal must include these. */
-const CANVA_SCOPES = 'design:content:write design:meta:read';
+const CANVA_SCOPES =
+  'design:content:read design:content:write design:meta:read';
 
 export interface CanvaTokenResponse {
   access_token: string;
@@ -168,6 +169,63 @@ export class CanvaService {
     }
   }
 
+  async getDesign(
+    accessToken: string,
+    designId: string,
+  ): Promise<{ editUrl: string | null } | null> {
+    try {
+      const res = await fetch(
+        `${CANVA_API_BASE}/designs/${encodeURIComponent(designId)}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        this.logger.warn(`Canva get design failed: ${res.status} ${text}`);
+        return null;
+      }
+      const data = (await res.json()) as {
+        design?: { urls?: { edit_url?: string } };
+      };
+      return { editUrl: data.design?.urls?.edit_url ?? null };
+    } catch (e) {
+      this.logger.error(
+        `Canva get design error: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return null;
+    }
+  }
+
+  async getDesignPages(
+    accessToken: string,
+    designId: string,
+  ): Promise<{ index: number; thumbnailUrl: string }[]> {
+    try {
+      const res = await fetch(
+        `${CANVA_API_BASE}/designs/${encodeURIComponent(designId)}/pages?limit=200`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        this.logger.warn(`Canva get pages failed: ${res.status} ${text}`);
+        return [];
+      }
+      const data = (await res.json()) as {
+        items?: { index?: number; thumbnail?: { url?: string } }[];
+      };
+      return (data.items ?? [])
+        .filter((p) => p.index !== undefined && p.thumbnail?.url)
+        .map((p) => ({
+          index: p.index as number,
+          thumbnailUrl: p.thumbnail!.url as string,
+        }));
+    } catch (e) {
+      this.logger.error(
+        `Canva get pages error: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return [];
+    }
+  }
+
   async createPresentation(
     accessToken: string,
     title: string,
@@ -180,6 +238,7 @@ export class CanvaService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          type: 'type_and_asset',
           design_type: {
             type: 'preset',
             name: 'presentation',

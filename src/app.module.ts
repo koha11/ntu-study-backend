@@ -20,6 +20,7 @@ import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
 import { GoogleContactsModule } from './modules/google-contacts/google-contacts.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { CanvaModule } from './modules/canva/canva.module';
 @Module({
   imports: [
     AppConfigModule,
@@ -41,6 +42,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     GoogleContactsModule,
     AdminModule,
     DashboardModule,
+    CanvaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

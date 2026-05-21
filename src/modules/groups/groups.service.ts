@@ -269,6 +269,60 @@ export class GroupsService {
     return this.groupsRepository.save(group);
   }
 
+  async getCanvaPreview(
+    groupId: string,
+    userId: string,
+  ): Promise<{
+    editUrl: string | null;
+    pages: { index: number; thumbnailUrl: string }[];
+  }> {
+    const group = await this.findOneForMember(groupId, userId);
+
+    if (!group.canva_design_id) {
+      return { editUrl: null, pages: [] };
+    }
+
+    const leader = await this.usersService.findById(group.leader_id, true);
+    if (!leader?.canva_refresh_token && !leader?.canva_access_token) {
+      return { editUrl: null, pages: [] };
+    }
+
+    let accessToken = leader.canva_access_token ?? null;
+
+    const expired =
+      leader.canva_token_expires_at &&
+      leader.canva_token_expires_at.getTime() < Date.now();
+    if (expired && leader.canva_refresh_token) {
+      const tokens = await this.canvaService.refreshAccessToken(
+        leader.canva_refresh_token,
+      );
+      if (tokens) {
+        const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+        await this.usersService.update(leader.id, {
+          canva_access_token: tokens.access_token,
+          canva_refresh_token: tokens.refresh_token,
+          canva_token_expires_at: expiresAt,
+        });
+        accessToken = tokens.access_token;
+      }
+    }
+
+    if (!accessToken) {
+      return { editUrl: null, pages: [] };
+    }
+
+    const designId = group.canva_design_id;
+    const [design, pages] = await Promise.all([
+      this.canvaService.getDesign(accessToken, designId),
+      this.canvaService.getDesignPages(accessToken, designId),
+    ]);
+
+    return {
+      editUrl: design?.editUrl ?? null,
+      pages,
+    };
+  }
+
   /**
    * List events from the group's shared Google Calendar (leader token).
    * Any active member may view; requires `google_calendar_id` on the group.

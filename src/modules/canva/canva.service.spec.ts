@@ -162,6 +162,7 @@ describe('CanvaService', () => {
         'Bearer token',
       );
       const parsed = JSON.parse(init.body as string);
+      expect(parsed.type).toBe('type_and_asset');
       expect(parsed.title).toBe('My Group');
       expect(parsed.design_type).toEqual({
         type: 'preset',

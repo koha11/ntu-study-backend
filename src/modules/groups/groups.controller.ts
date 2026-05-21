@@ -123,6 +123,19 @@ export class GroupsController {
     );
   }
 
+  @Get(':id/canva-preview')
+  @ApiOperation({
+    summary:
+      'Get Canva design thumbnail and edit URL for a group (proxied via leader token)',
+  })
+  @ApiResponse({ status: 200, description: 'Preview data returned' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  getCanvaPreview(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.getCanvaPreview(id, user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get group details' })
   @ApiResponse({ status: 200, description: 'Group found' })
