@@ -29,7 +29,7 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `CREATE TABLE "roles" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "role_name" character varying(50) NOT NULL, CONSTRAINT "UQ_roles_role_name" UNIQUE ("role_name"), CONSTRAINT "PK_roles" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `INSERT INTO "roles" ("role_name") VALUES ('user'), ('leader'), ('admin')`,
+      `INSERT INTO "roles" ("role_name") VALUES ('user'), ('admin')`,
     );
     await queryRunner.query(
       `CREATE TABLE "group_members" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "group_id" uuid NOT NULL, "user_id" uuid NOT NULL, "is_active" boolean NOT NULL DEFAULT false, CONSTRAINT "UQ_f5939ee0ad233ad35e03f5c65c1" UNIQUE ("group_id", "user_id"), CONSTRAINT "PK_86446139b2c96bfd0f3b8638852" PRIMARY KEY ("id"))`,
