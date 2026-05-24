@@ -472,7 +472,9 @@ export class InitialSchema1779199165939 implements MigrationInterface {
     await queryRunner.query(
       `DROP TYPE "public"."notifications_delivery_channel_enum"`,
     );
-    await queryRunner.query(`DROP TYPE "public"."users_preferred_language_enum"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."users_preferred_language_enum"`,
+    );
     await queryRunner.query(`DROP TYPE "public"."groups_status_enum"`);
     await queryRunner.query(`DROP TYPE "public"."cron_job_runs_status_enum"`);
     await queryRunner.query(
