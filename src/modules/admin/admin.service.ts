@@ -10,7 +10,7 @@ import { Group } from '@modules/groups/entities/group.entity';
 import { GroupMember } from '@modules/groups/entities/group-member.entity';
 import { Task } from '@modules/tasks/entities/task.entity';
 import { CronJobRun } from '@modules/cron-jobs/entities/cron-job-run.entity';
-import { CronJobRunStatus, UserRole } from '@common/enums';
+import { CronJobRunStatus } from '@common/enums';
 
 const MAX_PAGE = 100;
 
@@ -19,7 +19,7 @@ export type AdminUserRow = {
   email: string;
   full_name: string;
   avatar_url?: string | null;
-  role: UserRole;
+  role: string;
   is_active: boolean;
   locked: boolean;
 };
@@ -80,6 +80,7 @@ export class AdminService {
     const takeClamped = this.clampTake(take);
     const qb = this.usersRepository
       .createQueryBuilder('u')
+      .leftJoinAndSelect('u.role', 'r')
       .orderBy('u.created_at', 'DESC')
       .skip(skip)
       .take(takeClamped);
@@ -98,7 +99,7 @@ export class AdminService {
         email: u.email,
         full_name: u.full_name,
         avatar_url: u.avatar_url,
-        role: u.role,
+        role: u.role?.role_name ?? '',
         is_active: u.is_active,
         locked: !u.is_active,
       })),
@@ -107,11 +108,14 @@ export class AdminService {
   }
 
   async lockUser(userId: string): Promise<AdminUserRow> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: { role: true },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    if (user.role === UserRole.ADMIN) {
+    if (user.role?.role_name === 'admin') {
       throw new ForbiddenException('Cannot lock another admin');
     }
     user.is_active = false;
@@ -121,14 +125,17 @@ export class AdminService {
       email: user.email,
       full_name: user.full_name,
       avatar_url: user.avatar_url,
-      role: user.role,
+      role: user.role?.role_name ?? '',
       is_active: user.is_active,
       locked: !user.is_active,
     };
   }
 
   async unlockUser(userId: string): Promise<AdminUserRow> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: { role: true },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -139,7 +146,7 @@ export class AdminService {
       email: user.email,
       full_name: user.full_name,
       avatar_url: user.avatar_url,
-      role: user.role,
+      role: user.role?.role_name ?? '',
       is_active: user.is_active,
       locked: !user.is_active,
     };

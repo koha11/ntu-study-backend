@@ -2,54 +2,35 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
+import { Role } from './entities/role.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User) private usersRepository: Repository<User>,
+    @InjectRepository(Role) private rolesRepository: Repository<Role>,
   ) {}
 
   async findOne(id: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { id },
+      relations: { role: true },
     });
   }
 
-  async findById(id: string, includeHidden = false): Promise<User | null> {
-    if (includeHidden) {
-      return this.usersRepository.findOne({
-        where: { id },
-        select: [
-          'id',
-          'email',
-          'full_name',
-          'avatar_url',
-          'role',
-          'google_access_token',
-          'google_refresh_token',
-          'token_expires_at',
-          'drive_total_quota',
-          'drive_used_quota',
-          'quota_last_updated',
-          'is_active',
-          'notification_enabled',
-          'preferred_language',
-          'last_login_at',
-          'canva_access_token',
-          'canva_refresh_token',
-          'canva_token_expires_at',
-          'created_at',
-          'updated_at',
-        ],
-      });
-    }
+  async findById(id: string, _includeHidden?: boolean): Promise<User | null> {
     return this.findOne(id);
   }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { email },
+      relations: { role: true },
     });
+  }
+
+  async findRoleByName(roleName: string): Promise<Role | null> {
+    return this.rolesRepository.findOne({ where: { role_name: roleName } });
   }
 
   async findDriveQuotaByUserId(

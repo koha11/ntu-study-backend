@@ -1,15 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { DriveItem } from './entities/drive-item.entity';
 
 @Injectable()
 export class GoogleDriveService {
-  constructor(
-    @InjectRepository(DriveItem)
-    private driveItemsRepository: Repository<DriveItem>,
-  ) {}
-
   async createGroupFolder(
     _groupId: string,
     _groupName: string,

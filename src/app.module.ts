@@ -14,7 +14,6 @@ import { InvitationsModule } from './modules/invitations/invitations.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { FlashcardsModule } from './modules/flashcards/flashcards.module';
 import { ContributionsModule } from './modules/contributions/contributions.module';
-import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { GoogleDriveModule } from './modules/google-drive/google-drive.module';
 import { GoogleContactsModule } from './modules/google-contacts/google-contacts.module';
@@ -36,7 +35,6 @@ import { CanvaModule } from './modules/canva/canva.module';
     TasksModule,
     FlashcardsModule,
     ContributionsModule,
-    AuditLogsModule,
     NotificationsModule,
     GoogleDriveModule,
     GoogleContactsModule,

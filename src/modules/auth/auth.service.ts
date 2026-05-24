@@ -6,7 +6,6 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '@modules/users/users.service';
 import { GoogleTokenExchangeService } from './services/google-token-exchange.service';
-import { UserRole } from '@common/enums';
 import { ConfigService } from '@nestjs/config';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { User } from '@modules/users/entities/user.entity';
@@ -21,7 +20,7 @@ export class AuthService {
   ) {}
 
   private async getTokens(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { sub: user.id, email: user.email, role: user.role?.role_name };
     const accessExpiry =
       this.configService.get<number>('JWT_EXPIRATION') ?? 3600;
     const accessToken = await this.jwtService.signAsync(payload, {
@@ -88,6 +87,10 @@ export class AuthService {
           last_login_at: new Date(),
         });
       } else {
+        const defaultRole = await this.usersService.findRoleByName('user');
+        if (!defaultRole) {
+          throw new InternalServerErrorException('Default role not found');
+        }
         user = await this.usersService.create({
           email: googleProfile.email,
           full_name: googleProfile.full_name,
@@ -95,7 +98,7 @@ export class AuthService {
           google_access_token: googleProfile.google_access_token,
           google_refresh_token: googleProfile.google_refresh_token,
           token_expires_at: googleProfile.token_expires_at,
-          role: UserRole.USER,
+          role_id: defaultRole.id,
           is_active: true,
           notification_enabled: true,
           last_login_at: new Date(),

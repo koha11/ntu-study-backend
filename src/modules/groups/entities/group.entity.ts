@@ -13,9 +13,7 @@ import { GroupMember } from './group-member.entity';
 import { GroupInvitation } from './group-invitation.entity';
 import { Task } from '@modules/tasks/entities/task.entity';
 import { ContributionRating } from '@modules/contributions/entities/contribution-rating.entity';
-import { DriveItem } from '@modules/google-drive/entities/drive-item.entity';
 import { SharedGroupFlashcard } from '@modules/flashcards/entities/shared-group-flashcard.entity';
-import { AuditLog } from '@modules/audit-logs/entities/audit-log.entity';
 
 @Entity('groups')
 @Index(['leader_id'])
@@ -78,12 +76,6 @@ export class Group extends BaseEntity {
   @OneToMany(() => ContributionRating, (rating) => rating.group)
   contribution_ratings!: ContributionRating[];
 
-  @OneToMany(() => DriveItem, (item) => item.group)
-  drive_items!: DriveItem[];
-
   @OneToMany(() => SharedGroupFlashcard, (shared) => shared.group)
   shared_flashcards!: SharedGroupFlashcard[];
-
-  @OneToMany(() => AuditLog, (log) => log.group)
-  audit_logs!: AuditLog[];
 }

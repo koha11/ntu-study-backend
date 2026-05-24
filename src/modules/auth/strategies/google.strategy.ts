@@ -3,7 +3,6 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { AuthService } from '../auth.service';
 import { UsersService } from '@modules/users/users.service';
-import { UserRole } from '@common/enums';
 
 /**
  * Passport Google OAuth Strategy for server-side redirect-based authentication flow
@@ -59,14 +58,17 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
           last_login_at: new Date(),
         });
       } else {
-        // New user: create with default role
+        const defaultRole = await this.usersService.findRoleByName('user');
+        if (!defaultRole) {
+          return done(new Error('Default role not found'), undefined);
+        }
         user = await this.usersService.create({
           email,
           full_name: profile.displayName || 'Google User',
           avatar_url: profile.photos?.[0]?.value,
           google_access_token: accessToken,
           google_refresh_token: refreshToken,
-          role: UserRole.USER,
+          role_id: defaultRole.id,
           is_active: true,
           notification_enabled: true,
           last_login_at: new Date(),

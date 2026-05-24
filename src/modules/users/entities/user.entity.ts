@@ -3,12 +3,13 @@ import {
   Column,
   Unique,
   OneToMany,
-  ManyToMany,
-  JoinTable,
+  ManyToOne,
+  JoinColumn,
   Index,
 } from 'typeorm';
-import { Language, UserRole } from '@common/enums';
+import { Language } from '@common/enums';
 import { BaseEntity } from '@common/entities/base.entity';
+import { Role } from './role.entity';
 import { Group } from '@modules/groups/entities/group.entity';
 import { GroupMember } from '@modules/groups/entities/group-member.entity';
 import { GroupInvitation } from '@modules/groups/entities/group-invitation.entity';
@@ -16,12 +17,11 @@ import { Task } from '@modules/tasks/entities/task.entity';
 import { ContributionRating } from '@modules/contributions/entities/contribution-rating.entity';
 import { FlashcardSet } from '@modules/flashcards/entities/flashcard-set.entity';
 import { FlashcardStudyLog } from '@modules/flashcards/entities/flashcard-study-log.entity';
-import { AuditLog } from '@modules/audit-logs/entities/audit-log.entity';
 import { Notification } from '@modules/notifications/entities/notification.entity';
 
 @Entity('users')
 @Unique(['email'])
-@Index(['role'])
+@Index(['role_id'])
 @Index(['is_active'])
 @Index(['created_at'])
 export class User extends BaseEntity {
@@ -34,8 +34,12 @@ export class User extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   avatar_url?: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
-  role!: UserRole;
+  @Column({ name: 'role_id', type: 'uuid' })
+  role_id!: string;
+
+  @ManyToOne(() => Role)
+  @JoinColumn({ name: 'role_id' })
+  role!: Role;
 
   @Column({ type: 'text', nullable: true })
   google_access_token?: string;
@@ -107,9 +111,6 @@ export class User extends BaseEntity {
 
   @OneToMany(() => FlashcardStudyLog, (log) => log.user)
   study_logs!: FlashcardStudyLog[];
-
-  @OneToMany(() => AuditLog, (log) => log.actor)
-  audit_logs!: AuditLog[];
 
   @OneToMany(() => Notification, (notification) => notification.recipient)
   notifications!: Notification[];

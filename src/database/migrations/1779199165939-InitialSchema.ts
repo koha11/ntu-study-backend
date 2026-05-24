@@ -11,19 +11,10 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `CREATE TYPE "public"."tasks_status_enum" AS ENUM('todo', 'in_progress', 'pending_review', 'done', 'failed')`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."audit_logs_source_enum" AS ENUM('app', 'drive_api')`,
-    );
-    await queryRunner.query(
       `CREATE TYPE "public"."notifications_delivery_channel_enum" AS ENUM('web', 'email', 'both')`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."users_role_enum" AS ENUM('user', 'leader', 'admin')`,
-    );
-    await queryRunner.query(
       `CREATE TYPE "public"."users_preferred_language_enum" AS ENUM('en', 'vi')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."drive_items_type_enum" AS ENUM('file', 'folder')`,
     );
     await queryRunner.query(
       `CREATE TYPE "public"."groups_status_enum" AS ENUM('active', 'locked')`,
@@ -33,6 +24,12 @@ export class InitialSchema1779199165939 implements MigrationInterface {
     );
     await queryRunner.query(
       `CREATE TYPE "public"."cron_job_runs_triggered_by_enum" AS ENUM('cron', 'manual')`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE "roles" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "role_name" character varying(50) NOT NULL, CONSTRAINT "UQ_roles_role_name" UNIQUE ("role_name"), CONSTRAINT "PK_roles" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `INSERT INTO "roles" ("role_name") VALUES ('user'), ('leader'), ('admin')`,
     );
     await queryRunner.query(
       `CREATE TABLE "group_members" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "group_id" uuid NOT NULL, "user_id" uuid NOT NULL, "is_active" boolean NOT NULL DEFAULT false, CONSTRAINT "UQ_f5939ee0ad233ad35e03f5c65c1" UNIQUE ("group_id", "user_id"), CONSTRAINT "PK_86446139b2c96bfd0f3b8638852" PRIMARY KEY ("id"))`,
@@ -137,24 +134,6 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `CREATE INDEX "IDX_ab4a59cdd2f7f1b65bb3ffcad2" ON "flashcard_sets" ("owner_id") `,
     );
     await queryRunner.query(
-      `CREATE TABLE "audit_logs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "group_id" uuid NOT NULL, "actor_id" uuid, "action" character varying(100) NOT NULL, "description" text, "source" "public"."audit_logs_source_enum" NOT NULL DEFAULT 'app', "metadata" jsonb, CONSTRAINT "PK_1bb179d048bbc581caa3b013439" PRIMARY KEY ("id"))`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_2cd10fda8276bb995288acfbfb" ON "audit_logs" ("created_at") `,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_2d7cb03a589a1a9f6a2a844b99" ON "audit_logs" ("source") `,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_cee5459245f652b75eb2759b4c" ON "audit_logs" ("action") `,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_177183f29f438c488b5e8510cd" ON "audit_logs" ("actor_id") `,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_7e3225923f97878c41934d3271" ON "audit_logs" ("group_id") `,
-    );
-    await queryRunner.query(
       `CREATE TABLE "notifications" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "recipient_id" uuid NOT NULL, "type" character varying(100) NOT NULL, "message" text NOT NULL, "is_read" boolean NOT NULL DEFAULT false, "delivery_channel" "public"."notifications_delivery_channel_enum" NOT NULL DEFAULT 'web', "related_entity_type" character varying(255), "related_entity_id" uuid, CONSTRAINT "PK_6a72c3c0f683f6462415e653c3a" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
@@ -170,7 +149,7 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `CREATE INDEX "IDX_5332a4daa46fd3f4e6625dd275" ON "notifications" ("recipient_id") `,
     );
     await queryRunner.query(
-      `CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "email" character varying(255) NOT NULL, "full_name" character varying(255) NOT NULL, "avatar_url" text, "role" "public"."users_role_enum" NOT NULL DEFAULT 'user', "google_access_token" text, "google_refresh_token" text, "token_expires_at" TIMESTAMP WITH TIME ZONE, "drive_total_quota" bigint, "drive_used_quota" bigint, "quota_last_updated" TIMESTAMP WITH TIME ZONE, "is_active" boolean NOT NULL DEFAULT true, "notification_enabled" boolean NOT NULL DEFAULT true, "preferred_language" "public"."users_preferred_language_enum" NOT NULL DEFAULT 'vi', "last_login_at" TIMESTAMP WITH TIME ZONE, "canva_access_token" text, "canva_refresh_token" text, "canva_token_expires_at" TIMESTAMP WITH TIME ZONE, "refresh_token_version" integer NOT NULL DEFAULT '0', CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "email" character varying(255) NOT NULL, "full_name" character varying(255) NOT NULL, "avatar_url" text, "role_id" uuid NOT NULL, "google_access_token" text, "google_refresh_token" text, "token_expires_at" TIMESTAMP WITH TIME ZONE, "drive_total_quota" bigint, "drive_used_quota" bigint, "quota_last_updated" TIMESTAMP WITH TIME ZONE, "is_active" boolean NOT NULL DEFAULT true, "notification_enabled" boolean NOT NULL DEFAULT true, "preferred_language" "public"."users_preferred_language_enum" NOT NULL DEFAULT 'vi', "last_login_at" TIMESTAMP WITH TIME ZONE, "canva_access_token" text, "canva_refresh_token" text, "canva_token_expires_at" TIMESTAMP WITH TIME ZONE, "refresh_token_version" integer NOT NULL DEFAULT '0', CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_c9b5b525a96ddc2c5647d7f7fa" ON "users" ("created_at") `,
@@ -179,22 +158,7 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `CREATE INDEX "IDX_20c7aea6112bef71528210f631" ON "users" ("is_active") `,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_ace513fa30d485cfd25c11a9e4" ON "users" ("role") `,
-    );
-    await queryRunner.query(
-      `CREATE TABLE "drive_items" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "group_id" uuid NOT NULL, "drive_file_id" character varying(255) NOT NULL, "parent_drive_id" character varying(255), "mime_type" character varying(255) NOT NULL, "type" "public"."drive_items_type_enum" NOT NULL, "web_view_link" text, "file_size" bigint NOT NULL, "name" character varying(255), CONSTRAINT "PK_0b728ec159f3e141c4904830943" PRIMARY KEY ("id"))`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_0ae8b5d8157da4ae9b7974d552" ON "drive_items" ("mime_type") `,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_6f7b1718fb5ec7ac549992adc3" ON "drive_items" ("parent_drive_id") `,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_9e015375bba2fbf5355f47ecbd" ON "drive_items" ("drive_file_id") `,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_542da77dddb6683ba61e3d9949" ON "drive_items" ("group_id") `,
+      `CREATE INDEX "IDX_ace513fa30d485cfd25c11a9e4" ON "users" ("role_id") `,
     );
     await queryRunner.query(
       `CREATE TABLE "groups" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "name" character varying(255) NOT NULL, "description" text, "leader_id" uuid NOT NULL, "report_date" date, "tags" text array NOT NULL DEFAULT '{}', "status" "public"."groups_status_enum" NOT NULL DEFAULT 'active', "drive_folder_id" character varying(255), "canva_file_url" text, "canva_design_id" text, "doc_file_url" text, "meet_link" text, "google_calendar_id" character varying(512), CONSTRAINT "PK_659d1483316afb28afd3a90646e" PRIMARY KEY ("id"))`,
@@ -225,6 +189,9 @@ export class InitialSchema1779199165939 implements MigrationInterface {
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_6eff432603179fc4cc5ea56e89" ON "cron_job_runs" ("job_name") `,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" ADD CONSTRAINT "FK_a2cecd1a3531c0b041e29ba46e1" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
       `ALTER TABLE "group_members" ADD CONSTRAINT "FK_2c840df5db52dc6b4a1b0b69c6e" FOREIGN KEY ("group_id") REFERENCES "groups"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
@@ -281,16 +248,7 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `ALTER TABLE "flashcard_sets" ADD CONSTRAINT "FK_ab4a59cdd2f7f1b65bb3ffcad2a" FOREIGN KEY ("owner_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
-      `ALTER TABLE "audit_logs" ADD CONSTRAINT "FK_7e3225923f97878c41934d32717" FOREIGN KEY ("group_id") REFERENCES "groups"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "audit_logs" ADD CONSTRAINT "FK_177183f29f438c488b5e8510cdb" FOREIGN KEY ("actor_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
-    );
-    await queryRunner.query(
       `ALTER TABLE "notifications" ADD CONSTRAINT "FK_5332a4daa46fd3f4e6625dd275d" FOREIGN KEY ("recipient_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "drive_items" ADD CONSTRAINT "FK_542da77dddb6683ba61e3d9949e" FOREIGN KEY ("group_id") REFERENCES "groups"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
       `ALTER TABLE "groups" ADD CONSTRAINT "FK_fdb67d577cb1623e0d11a3fa6b0" FOREIGN KEY ("leader_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
@@ -314,16 +272,7 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `ALTER TABLE "groups" DROP CONSTRAINT "FK_fdb67d577cb1623e0d11a3fa6b0"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "drive_items" DROP CONSTRAINT "FK_542da77dddb6683ba61e3d9949e"`,
-    );
-    await queryRunner.query(
       `ALTER TABLE "notifications" DROP CONSTRAINT "FK_5332a4daa46fd3f4e6625dd275d"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "audit_logs" DROP CONSTRAINT "FK_177183f29f438c488b5e8510cdb"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "audit_logs" DROP CONSTRAINT "FK_7e3225923f97878c41934d32717"`,
     );
     await queryRunner.query(
       `ALTER TABLE "flashcard_sets" DROP CONSTRAINT "FK_ab4a59cdd2f7f1b65bb3ffcad2a"`,
@@ -380,6 +329,9 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `ALTER TABLE "group_members" DROP CONSTRAINT "FK_2c840df5db52dc6b4a1b0b69c6e"`,
     );
     await queryRunner.query(
+      `ALTER TABLE "users" DROP CONSTRAINT "FK_a2cecd1a3531c0b041e29ba46e1"`,
+    );
+    await queryRunner.query(
       `DROP INDEX "public"."IDX_6eff432603179fc4cc5ea56e89"`,
     );
     await queryRunner.query(
@@ -404,19 +356,6 @@ export class InitialSchema1779199165939 implements MigrationInterface {
     );
     await queryRunner.query(`DROP TABLE "groups"`);
     await queryRunner.query(
-      `DROP INDEX "public"."IDX_542da77dddb6683ba61e3d9949"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_9e015375bba2fbf5355f47ecbd"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_6f7b1718fb5ec7ac549992adc3"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_0ae8b5d8157da4ae9b7974d552"`,
-    );
-    await queryRunner.query(`DROP TABLE "drive_items"`);
-    await queryRunner.query(
       `DROP INDEX "public"."IDX_ace513fa30d485cfd25c11a9e4"`,
     );
     await queryRunner.query(
@@ -426,9 +365,7 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `DROP INDEX "public"."IDX_c9b5b525a96ddc2c5647d7f7fa"`,
     );
     await queryRunner.query(`DROP TABLE "users"`);
-    await queryRunner.query(
-      `DROP TYPE "public"."users_preferred_language_enum"`,
-    );
+    await queryRunner.query(`DROP TABLE "roles"`);
     await queryRunner.query(
       `DROP INDEX "public"."IDX_5332a4daa46fd3f4e6625dd275"`,
     );
@@ -442,22 +379,6 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `DROP INDEX "public"."IDX_77ee7b06d6f802000c0846f3a5"`,
     );
     await queryRunner.query(`DROP TABLE "notifications"`);
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_7e3225923f97878c41934d3271"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_177183f29f438c488b5e8510cd"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_cee5459245f652b75eb2759b4c"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_2d7cb03a589a1a9f6a2a844b99"`,
-    );
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_2cd10fda8276bb995288acfbfb"`,
-    );
-    await queryRunner.query(`DROP TABLE "audit_logs"`);
     await queryRunner.query(
       `DROP INDEX "public"."IDX_ab4a59cdd2f7f1b65bb3ffcad2"`,
     );
@@ -548,12 +469,10 @@ export class InitialSchema1779199165939 implements MigrationInterface {
       `DROP TYPE "public"."group_invitations_status_enum"`,
     );
     await queryRunner.query(`DROP TYPE "public"."tasks_status_enum"`);
-    await queryRunner.query(`DROP TYPE "public"."audit_logs_source_enum"`);
     await queryRunner.query(
       `DROP TYPE "public"."notifications_delivery_channel_enum"`,
     );
-    await queryRunner.query(`DROP TYPE "public"."users_role_enum"`);
-    await queryRunner.query(`DROP TYPE "public"."drive_items_type_enum"`);
+    await queryRunner.query(`DROP TYPE "public"."users_preferred_language_enum"`);
     await queryRunner.query(`DROP TYPE "public"."groups_status_enum"`);
     await queryRunner.query(`DROP TYPE "public"."cron_job_runs_status_enum"`);
     await queryRunner.query(
