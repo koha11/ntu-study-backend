@@ -12,7 +12,11 @@ import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 describe('GoogleDriveController', () => {
   let controller: GoogleDriveController;
   let groupsService: { findOneForMember: ReturnType<typeof vi.fn> };
-  let usersService: { findById: ReturnType<typeof vi.fn> };
+  let usersService: {
+    findById: ReturnType<typeof vi.fn>;
+    findDriveQuotaByUserId: ReturnType<typeof vi.fn>;
+    updateDriveUsedQuota: ReturnType<typeof vi.fn>;
+  };
   let commonDrive: {
     listFiles: ReturnType<typeof vi.fn>;
     isResourceUnderFolder: ReturnType<typeof vi.fn>;
@@ -31,6 +35,8 @@ describe('GoogleDriveController', () => {
     };
     usersService = {
       findById: vi.fn(),
+      findDriveQuotaByUserId: vi.fn(),
+      updateDriveUsedQuota: vi.fn().mockResolvedValue(undefined),
     };
     commonDrive = {
       listFiles: vi.fn(),
@@ -433,6 +439,189 @@ describe('GoogleDriveController', () => {
     expect(result[0]).toMatchObject({
       modifiedTime: '2026-05-01T12:00:00.000Z',
       lastModifiedBy: 'Alice Lee',
+    });
+  });
+
+  it('getGroupDriveActivity returns empty items when queryFolderActivity returns null', async () => {
+    usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+    groupsService.findOneForMember.mockResolvedValue({ id: 'g1', drive_folder_id: 'root-folder' });
+    commonDrive.queryFolderActivity.mockResolvedValue(null);
+
+    const req = { user: { id: 'u1' } } as never;
+    const result = await controller.getGroupDriveActivity(req, 'g1');
+
+    expect(result).toEqual({ items: [] });
+  });
+
+  it('getGroupDriveActivity returns empty when group has no drive_folder_id', async () => {
+    usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+    groupsService.findOneForMember.mockResolvedValue({ id: 'g1', drive_folder_id: null });
+
+    const req = { user: { id: 'u1' } } as never;
+    const result = await controller.getGroupDriveActivity(req, 'g1');
+
+    expect(result).toEqual({ items: [] });
+    expect(commonDrive.queryFolderActivity).not.toHaveBeenCalled();
+  });
+
+  it('uploadGroupDriveFile throws when no file provided', async () => {
+    usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+    groupsService.findOneForMember.mockResolvedValue({ id: 'g1', drive_folder_id: 'root-folder' });
+
+    const req = { user: { id: 'u1' } } as never;
+    await expect(
+      controller.uploadGroupDriveFile(req, 'g1', undefined, {}),
+    ).rejects.toThrow(/File is required/);
+  });
+
+  it('uploadGroupDriveFile throws ForbiddenException when parent not under group folder', async () => {
+    usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+    groupsService.findOneForMember.mockResolvedValue({ id: 'g1', drive_folder_id: 'root-folder' });
+    commonDrive.isResourceUnderFolder.mockResolvedValueOnce(false);
+
+    const req = { user: { id: 'u1' } } as never;
+    const file = { originalname: 'a.pdf', mimetype: 'application/pdf', buffer: Buffer.from('x') } as Express.Multer.File;
+    await expect(
+      controller.uploadGroupDriveFile(req, 'g1', file, { parentFolderId: 'evil' }),
+    ).rejects.toThrow(/Invalid parent folder/);
+  });
+
+  it('uploadGroupDriveFile throws BadRequestException when upload returns no id', async () => {
+    usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+    groupsService.findOneForMember.mockResolvedValue({ id: 'g1', drive_folder_id: 'root-folder' });
+    commonDrive.uploadFile.mockResolvedValue(null);
+
+    const req = { user: { id: 'u1' } } as never;
+    const file = { originalname: 'a.pdf', mimetype: 'application/pdf', buffer: Buffer.from('x') } as Express.Multer.File;
+    await expect(
+      controller.uploadGroupDriveFile(req, 'g1', file, {}),
+    ).rejects.toThrow(/Could not upload file/);
+  });
+
+  it('createGroupDriveFolder throws when folder creation returns null', async () => {
+    usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+    groupsService.findOneForMember.mockResolvedValue({ id: 'g1', drive_folder_id: 'root-folder' });
+    commonDrive.createFolder.mockResolvedValue(null);
+
+    const req = { user: { id: 'u1' } } as never;
+    await expect(
+      controller.createGroupDriveFolder(req, 'g1', { name: 'Bad' }),
+    ).rejects.toThrow(/Could not create folder/);
+  });
+
+  it('syncGroupDrive returns empty object', async () => {
+    const result = await (controller as any).syncGroupDrive('g1');
+    expect(result).toEqual({});
+  });
+
+  it('getGroupAssets returns [] when folderId query is not under root folder', async () => {
+    usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+    groupsService.findOneForMember.mockResolvedValue({ id: 'g1', drive_folder_id: 'root-folder' });
+    commonDrive.isResourceUnderFolder.mockResolvedValueOnce(false);
+
+    const req = { user: { id: 'u1' } } as never;
+    const result = await controller.getGroupAssets(req, 'g1', 'evil-folder');
+
+    expect(result).toEqual([]);
+    expect(commonDrive.listFiles).not.toHaveBeenCalled();
+  });
+
+  it('getGroupDriveFileContent throws BadRequestException when preview returns null', async () => {
+    usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+    groupsService.findOneForMember.mockResolvedValue({ id: 'g1', drive_folder_id: 'root-folder' });
+    commonDrive.isResourceUnderFolder.mockResolvedValue(true);
+    commonDrive.getFileContentStreamForPreview.mockResolvedValue(null);
+
+    const req = { user: { id: 'u1' } } as never;
+    await expect(
+      controller.getGroupDriveFileContent(req, 'g1', 'fid'),
+    ).rejects.toThrow(/Could not load file/);
+  });
+
+  it('getGroupDriveActivity returns empty when user not found', async () => {
+    usersService.findById.mockResolvedValue(null);
+
+    const req = { user: { id: 'u1' } } as never;
+    const result = await controller.getGroupDriveActivity(req, 'g1');
+
+    expect(result).toEqual({ items: [] });
+  });
+
+  describe('getMyDriveQuota', () => {
+    it('returns quota for authenticated user', async () => {
+      usersService.findDriveQuotaByUserId.mockResolvedValue({
+        drive_total_quota: '10737418240',
+        drive_used_quota: '1073741824',
+        quota_last_updated: new Date('2026-01-01'),
+      });
+
+      const req = { user: { id: 'u1' } } as never;
+      const result = await controller.getMyDriveQuota(req);
+
+      expect(usersService.findDriveQuotaByUserId).toHaveBeenCalledWith('u1');
+      expect(result.total_bytes).toBe('10737418240');
+      expect(result.used_bytes).toBe('1073741824');
+    });
+
+    it('throws NotFoundException when user not found', async () => {
+      usersService.findDriveQuotaByUserId.mockResolvedValue(null);
+
+      const req = { user: { id: 'missing' } } as never;
+      await expect(controller.getMyDriveQuota(req)).rejects.toThrow(/User not found/);
+    });
+
+    it('returns null values when quota fields are null', async () => {
+      usersService.findDriveQuotaByUserId.mockResolvedValue({
+        drive_total_quota: null,
+        drive_used_quota: null,
+        quota_last_updated: null,
+      });
+
+      const req = { user: { id: 'u1' } } as never;
+      const result = await controller.getMyDriveQuota(req);
+
+      expect(result.total_bytes).toBeNull();
+      expect(result.used_bytes).toBeNull();
+      expect(result.quota_last_updated).toBeNull();
+    });
+  });
+
+  describe('refreshMyDriveQuota', () => {
+    it('refreshes and returns updated quota', async () => {
+      usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+      commonDrive.getAboutStorageQuota = vi.fn().mockResolvedValue({ usage: '500000' });
+      usersService.findDriveQuotaByUserId.mockResolvedValue({
+        drive_total_quota: null, drive_used_quota: '500000', quota_last_updated: null,
+      });
+
+      const req = { user: { id: 'u1' } } as never;
+      const result = await (controller as any).refreshMyDriveQuota(req);
+
+      expect(usersService.updateDriveUsedQuota).toHaveBeenCalledWith('u1', '500000');
+      expect(result.used_bytes).toBe('500000');
+    });
+
+    it('throws NotFoundException when user not found', async () => {
+      usersService.findById.mockResolvedValue(null);
+
+      const req = { user: { id: 'missing' } } as never;
+      await expect((controller as any).refreshMyDriveQuota(req)).rejects.toThrow(/User not found/);
+    });
+
+    it('throws ForbiddenException when no Google access token', async () => {
+      usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: null });
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(null);
+
+      const req = { user: { id: 'u1' } } as never;
+      await expect((controller as any).refreshMyDriveQuota(req)).rejects.toThrow(/Google Drive access required/);
+    });
+
+    it('throws BadRequestException when quota fetch fails', async () => {
+      usersService.findById.mockResolvedValue({ id: 'u1', google_access_token: 'tok' });
+      commonDrive.getAboutStorageQuota = vi.fn().mockResolvedValue(null);
+
+      const req = { user: { id: 'u1' } } as never;
+      await expect((controller as any).refreshMyDriveQuota(req)).rejects.toThrow(/Could not read Drive storage quota/);
     });
   });
 

@@ -285,4 +285,193 @@ describe('ContributionsService', () => {
       expect(result).toBeInstanceOf(Date);
     });
   });
+
+  describe('closeEvaluation — throws when round not found', () => {
+    it('throws NotFoundException when no rows are affected', async () => {
+      const activeGroup = { id: groupId, leader_id: leaderId };
+      groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
+      qbChain.execute.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.closeEvaluation(groupId, leaderId, new Date('2026-04-01T00:00:00.000Z')),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('listRounds', () => {
+    const roundStartedAt = new Date('2026-04-01T00:00:00.000Z');
+    const activeGroup = { id: groupId, leader_id: leaderId };
+
+    beforeEach(() => {
+      groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
+      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true } as GroupMember);
+    });
+
+    it('returns mapped rounds from raw query', async () => {
+      qbChain.getRawMany.mockResolvedValueOnce([
+        {
+          round_started_at: roundStartedAt.toISOString(),
+          due_date: new Date('2026-04-08T00:00:00.000Z').toISOString(),
+          is_round_closed: false,
+          total_count: '4',
+          rated_count: '2',
+        },
+      ]);
+
+      const result = await service.listRounds(groupId, leaderId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].is_round_closed).toBe(false);
+      expect(result[0].total_count).toBe(4);
+      expect(result[0].rated_count).toBe(2);
+    });
+
+    it('throws ForbiddenException when user is not a group member', async () => {
+      membersRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.listRounds(groupId, 'outsider-id')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('throws NotFoundException when group does not exist', async () => {
+      groupsRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.listRounds('nonexistent', leaderId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('getMyRatingsForRound', () => {
+    const roundStartedAt = new Date('2026-04-01T00:00:00.000Z');
+    const activeGroup = { id: groupId, leader_id: leaderId };
+
+    beforeEach(() => {
+      groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
+      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true } as GroupMember);
+    });
+
+    it('returns rating rows when round exists', async () => {
+      qbChain.getMany.mockResolvedValueOnce([
+        {
+          score: null,
+          task: { id: 'task-1', title: 'Do thing', assignee: { full_name: 'Alice' } },
+        },
+      ]);
+
+      const result = await service.getMyRatingsForRound(groupId, roundStartedAt, leaderId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].task_title).toBe('Do thing');
+      expect(result[0].score).toBeNull();
+    });
+
+    it('throws NotFoundException when no ratings exist for round', async () => {
+      qbChain.getMany.mockResolvedValueOnce([]);
+
+      await expect(
+        service.getMyRatingsForRound(groupId, roundStartedAt, leaderId),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('submitRating', () => {
+    const roundStartedAt = new Date('2026-04-01T00:00:00.000Z');
+    const activeGroup = { id: groupId, leader_id: leaderId };
+    const taskId = 'task-1111-1111-1111-111111111111';
+
+    beforeEach(() => {
+      groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
+      membersRepository.findOne.mockResolvedValue({ user_id: memberId, is_active: true } as GroupMember);
+    });
+
+    it('saves the score and returns ok:true', async () => {
+      const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      ratingsRepository.findOne.mockResolvedValue({
+        id: 'rating-1',
+        is_round_closed: false,
+        due_date: futureDate,
+        score: null,
+      });
+      ratingsRepository.save.mockResolvedValue({});
+
+      const result = await service.submitRating(groupId, roundStartedAt, memberId, taskId, 8);
+
+      expect(ratingsRepository.save).toHaveBeenCalled();
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('throws NotFoundException when rating row not found', async () => {
+      ratingsRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.submitRating(groupId, roundStartedAt, memberId, taskId, 8),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when round is closed', async () => {
+      ratingsRepository.findOne.mockResolvedValue({
+        id: 'rating-1',
+        is_round_closed: true,
+        due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        score: null,
+      });
+
+      await expect(
+        service.submitRating(groupId, roundStartedAt, memberId, taskId, 8),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when deadline has passed', async () => {
+      ratingsRepository.findOne.mockResolvedValue({
+        id: 'rating-1',
+        is_round_closed: false,
+        due_date: new Date('2020-01-01'),
+        score: null,
+      });
+
+      await expect(
+        service.submitRating(groupId, roundStartedAt, memberId, taskId, 8),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('getAggregatedResults', () => {
+    const roundStartedAt = new Date('2026-04-01T00:00:00.000Z');
+    const activeGroup = { id: groupId, leader_id: leaderId };
+
+    beforeEach(() => {
+      groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
+      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true } as GroupMember);
+    });
+
+    it('returns aggregated results when round is closed', async () => {
+      ratingsRepository.findOne.mockResolvedValue({ is_round_closed: true });
+      qbChain.getRawMany.mockResolvedValueOnce([
+        { assignee_id: memberId, assignee_full_name: 'Member', average_score: '8.50' },
+      ]);
+
+      const result = await service.getAggregatedResults(groupId, roundStartedAt, leaderId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].average_score).toBe(8.5);
+    });
+
+    it('throws NotFoundException when round not found', async () => {
+      ratingsRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getAggregatedResults(groupId, roundStartedAt, leaderId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when round is still open', async () => {
+      ratingsRepository.findOne.mockResolvedValue({ is_round_closed: false });
+
+      await expect(
+        service.getAggregatedResults(groupId, roundStartedAt, leaderId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
 });

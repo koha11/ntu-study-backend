@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
-import { FlashcardsService } from './flashcards.service';
+import { NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
+import { FlashcardsService, nextReviewAtFromScore } from './flashcards.service';
 import { FlashcardSet } from './entities/flashcard-set.entity';
 import { Flashcard } from './entities/flashcard.entity';
 import { FlashcardStudyLog } from './entities/flashcard-study-log.entity';
@@ -30,6 +30,17 @@ describe('FlashcardsService', () => {
     create: ReturnType<typeof vi.fn>;
     save: ReturnType<typeof vi.fn>;
     find: ReturnType<typeof vi.fn>;
+    findOne: ReturnType<typeof vi.fn>;
+  };
+  let sharedRepository: {
+    find: ReturnType<typeof vi.fn>;
+    findOne: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    save: ReturnType<typeof vi.fn>;
+    remove: ReturnType<typeof vi.fn>;
+    createQueryBuilder: ReturnType<typeof vi.fn>;
+  };
+  let groupMembersRepository: {
     findOne: ReturnType<typeof vi.fn>;
   };
 
@@ -69,6 +80,25 @@ describe('FlashcardsService', () => {
       findOne: vi.fn(),
     };
 
+    const qb = {
+      innerJoin: vi.fn(),
+      where: vi.fn(),
+      getOne: vi.fn().mockResolvedValue(null),
+    };
+    qb.innerJoin.mockReturnValue(qb);
+    qb.where.mockReturnValue(qb);
+
+    sharedRepository = {
+      find: vi.fn().mockResolvedValue([]),
+      findOne: vi.fn().mockResolvedValue(null),
+      create: vi.fn((d: unknown) => d),
+      save: vi.fn((d: unknown) => Promise.resolve(d)),
+      remove: vi.fn().mockResolvedValue(undefined),
+      createQueryBuilder: vi.fn().mockReturnValue(qb),
+    };
+
+    groupMembersRepository = { findOne: vi.fn().mockResolvedValue(null) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FlashcardsService,
@@ -80,27 +110,11 @@ describe('FlashcardsService', () => {
         },
         {
           provide: getRepositoryToken(SharedGroupFlashcard),
-          useValue: (() => {
-            const qb = {
-              innerJoin: vi.fn(),
-              where: vi.fn(),
-              getOne: vi.fn().mockResolvedValue(null),
-            };
-            qb.innerJoin.mockReturnValue(qb);
-            qb.where.mockReturnValue(qb);
-            return {
-              find: vi.fn(),
-              findOne: vi.fn(),
-              create: vi.fn(),
-              save: vi.fn(),
-              remove: vi.fn(),
-              createQueryBuilder: vi.fn().mockReturnValue(qb),
-            };
-          })(),
+          useValue: sharedRepository,
         },
         {
           provide: getRepositoryToken(GroupMember),
-          useValue: { findOne: vi.fn() },
+          useValue: groupMembersRepository,
         },
       ],
     }).compile();
@@ -367,6 +381,267 @@ describe('FlashcardsService', () => {
       await expect(
         service.completeStudy(userId, setId, { score: 101 }),
       ).rejects.toThrow();
+    });
+
+    it('throws BadRequestException for score below 0', async () => {
+      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: userId });
+
+      await expect(
+        service.completeStudy(userId, setId, { score: -1 }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('updateSet', () => {
+    it('updates name and subject when user owns set', async () => {
+      const existing = { id: setId, owner_id: userId, name: 'Old', subject: null };
+      setsRepository.findOne.mockResolvedValue(existing);
+      setsRepository.save.mockImplementation((s: FlashcardSet) =>
+        Promise.resolve(s),
+      );
+
+      const result = await service.updateSet(userId, setId, {
+        name: 'New Name',
+        subject: 'CS101',
+      });
+
+      expect(result.name).toBe('New Name');
+      expect(result.subject).toBe('CS101');
+    });
+
+    it('throws NotFoundException when set not found', async () => {
+      setsRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateSet(userId, setId, { name: 'X' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when not owner', async () => {
+      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: otherUserId });
+
+      await expect(
+        service.updateSet(userId, setId, { name: 'X' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('updateFlashcard', () => {
+    it('updates front and back when user owns the set', async () => {
+      cardsRepository.findOne.mockResolvedValue({
+        id: cardId,
+        set_id: setId,
+        front: 'Old Q',
+        back: 'Old A',
+        set: { id: setId, owner_id: userId },
+      });
+      cardsRepository.save.mockImplementation((c: Flashcard) =>
+        Promise.resolve(c),
+      );
+
+      const result = await service.updateFlashcard(userId, setId, cardId, {
+        front: 'New Q',
+        back: 'New A',
+      });
+
+      expect(result.front).toBe('New Q');
+      expect(result.back).toBe('New A');
+    });
+
+    it('throws NotFoundException when card not found', async () => {
+      cardsRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateFlashcard(userId, setId, cardId, { front: 'X' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException when card belongs to different set', async () => {
+      cardsRepository.findOne.mockResolvedValue({
+        id: cardId,
+        set_id: 'other-set',
+        set: { id: 'other-set', owner_id: userId },
+      });
+
+      await expect(
+        service.updateFlashcard(userId, setId, cardId, { front: 'X' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when not owner of the set', async () => {
+      cardsRepository.findOne.mockResolvedValue({
+        id: cardId,
+        set_id: setId,
+        set: { id: setId, owner_id: otherUserId },
+      });
+
+      await expect(
+        service.updateFlashcard(userId, setId, cardId, { front: 'X' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('shareSetWithGroup', () => {
+    const groupId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+
+    it('creates a shared record when owner is a group member', async () => {
+      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: userId });
+      groupMembersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
+      sharedRepository.findOne.mockResolvedValue(null);
+      sharedRepository.save.mockImplementation((d: unknown) => Promise.resolve({ ...d as object, id: 'share-id' }));
+
+      const result = await service.shareSetWithGroup(userId, setId, groupId);
+
+      expect(sharedRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ set_id: setId, group_id: groupId }),
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('throws NotFoundException when set not found', async () => {
+      setsRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.shareSetWithGroup(userId, setId, groupId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when not owner of the set', async () => {
+      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: otherUserId });
+
+      await expect(
+        service.shareSetWithGroup(userId, setId, groupId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when user is not a group member', async () => {
+      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: userId });
+      groupMembersRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.shareSetWithGroup(userId, setId, groupId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ConflictException when already shared with group', async () => {
+      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: userId });
+      groupMembersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
+      sharedRepository.findOne.mockResolvedValue({ id: 'existing', set_id: setId, group_id: groupId });
+
+      await expect(
+        service.shareSetWithGroup(userId, setId, groupId),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('unshareSetFromGroup', () => {
+    const groupId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+
+    it('removes shared record when owner requests unshare', async () => {
+      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: userId });
+      const record = { id: 'share-id', set_id: setId, group_id: groupId };
+      sharedRepository.findOne.mockResolvedValue(record);
+
+      await service.unshareSetFromGroup(userId, setId, groupId);
+
+      expect(sharedRepository.remove).toHaveBeenCalledWith(record);
+    });
+
+    it('throws NotFoundException when set not found', async () => {
+      setsRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.unshareSetFromGroup(userId, setId, groupId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when not owner', async () => {
+      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: otherUserId });
+
+      await expect(
+        service.unshareSetFromGroup(userId, setId, groupId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws NotFoundException when shared record does not exist', async () => {
+      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: userId });
+      sharedRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.unshareSetFromGroup(userId, setId, groupId),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getGroupSharedSets', () => {
+    const groupId = 'gggggggg-gggg-gggg-gggg-gggggggggggg';
+
+    it('returns mapped shared set rows when user is a member', async () => {
+      groupMembersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
+      sharedRepository.find.mockResolvedValue([
+        {
+          id: 'share-1',
+          created_at: new Date('2026-01-01'),
+          set_id: setId,
+          group_id: groupId,
+          flashcard_set: {
+            owner_id: userId,
+            name: 'My Set',
+            subject: 'Math',
+            description: 'Algebra',
+            card_count: 5,
+          },
+        },
+      ]);
+
+      const result = await service.getGroupSharedSets(userId, groupId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        share_id: 'share-1',
+        set_id: setId,
+        group_id: groupId,
+        name: 'My Set',
+        subject: 'Math',
+        card_count: 5,
+      });
+    });
+
+    it('throws ForbiddenException when user is not a group member', async () => {
+      groupMembersRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getGroupSharedSets(userId, groupId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('nextReviewAtFromScore', () => {
+    it('returns a date in the future for any score', () => {
+      const now = new Date();
+      const result = nextReviewAtFromScore(50, now);
+      expect(result.getTime()).toBeGreaterThan(now.getTime());
+    });
+
+    it('returns shorter interval for score 0 than for score 100', () => {
+      const now = new Date();
+      const low = nextReviewAtFromScore(0, now);
+      const high = nextReviewAtFromScore(100, now);
+      expect(high.getTime()).toBeGreaterThan(low.getTime());
+    });
+
+    it('clamps score above 100 to 100', () => {
+      const now = new Date();
+      const clamped = nextReviewAtFromScore(150, now);
+      const max = nextReviewAtFromScore(100, now);
+      expect(clamped.getTime()).toBeCloseTo(max.getTime(), -3);
+    });
+
+    it('clamps score below 0 to 0', () => {
+      const now = new Date();
+      const clamped = nextReviewAtFromScore(-10, now);
+      const min = nextReviewAtFromScore(0, now);
+      expect(clamped.getTime()).toBeCloseTo(min.getTime(), -3);
     });
   });
 });

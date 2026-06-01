@@ -132,4 +132,28 @@ describe('InvitationsController', () => {
       leaderUserId: 'leader-1',
     });
   });
+
+  it('validateToken delegates to invitationsService.validateInvitationToken', async () => {
+    (invitationsService as Record<string, unknown>).validateInvitationToken = vi.fn().mockResolvedValue({ valid: true });
+
+    const result = await controller.validateToken('tok-abc');
+
+    expect((invitationsService as Record<string, unknown>).validateInvitationToken).toHaveBeenCalledWith('tok-abc');
+    expect(result).toEqual({ valid: true });
+  });
+
+  it('redirectAcceptPage returns 400 when Host header is missing', () => {
+    const json = vi.fn();
+    const status = vi.fn().mockReturnValue({ json });
+    const res = { status, json } as unknown as Response;
+    const req = {
+      protocol: 'https',
+      get: vi.fn().mockReturnValue(undefined),
+      originalUrl: '/invitations/tok/accept',
+    } as unknown as Request;
+
+    controller.redirectAcceptPage(req, 'tok', res);
+
+    expect(status).toHaveBeenCalledWith(400);
+  });
 });

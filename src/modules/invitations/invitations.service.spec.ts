@@ -345,6 +345,96 @@ describe('InvitationsService', () => {
         service.getPendingInvitationTokenForRecipient(invitationId, leaderId),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('throws NotFound when user not found', async () => {
+      usersService.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getPendingInvitationTokenForRecipient(invitationId, leaderId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFound when invitation not found in repository', async () => {
+      usersService.findOne.mockResolvedValue({ id: leaderId, email } as User);
+      invitationsRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getPendingInvitationTokenForRecipient(invitationId, leaderId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequest when invitation status is not PENDING', async () => {
+      usersService.findOne.mockResolvedValue({ id: leaderId, email } as User);
+      invitationsRepository.findOne.mockResolvedValue({
+        id: invitationId,
+        email,
+        token: 't',
+        status: InvitationStatus.ACCEPTED,
+        expires_at: new Date(Date.now() + 86400000),
+      } as GroupInvitation);
+
+      await expect(
+        service.getPendingInvitationTokenForRecipient(invitationId, leaderId),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequest when invitation is expired', async () => {
+      usersService.findOne.mockResolvedValue({ id: leaderId, email } as User);
+      invitationsRepository.findOne.mockResolvedValue({
+        id: invitationId,
+        email,
+        token: 't',
+        status: InvitationStatus.PENDING,
+        expires_at: new Date(Date.now() - 1000),
+      } as GroupInvitation);
+
+      await expect(
+        service.getPendingInvitationTokenForRecipient(invitationId, leaderId),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('acceptInvitation — additional branches', () => {
+    it('throws ConflictException when user is already a group member', async () => {
+      const user: Partial<User> = { id: inviteeUserId, email };
+      const invitation: Partial<GroupInvitation> = {
+        token: 'dup',
+        group_id: groupId,
+        email,
+        status: InvitationStatus.PENDING,
+        expires_at: new Date(Date.now() + 86400000),
+        group: group as Group,
+      };
+      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      usersService.findByEmail.mockResolvedValue(user as User);
+      membersRepository.findOne.mockResolvedValue({ user_id: inviteeUserId } as GroupMember);
+
+      await expect(service.acceptInvitation('dup', {})).rejects.toThrow(ConflictException);
+    });
+
+    it('auto-generates full_name from email when not provided', async () => {
+      const created: Partial<User> = { id: 'new-user-id', email };
+      const invitation: Partial<GroupInvitation> = {
+        token: 'auto',
+        group_id: groupId,
+        email: 'john.doe@ntu.edu',
+        status: InvitationStatus.PENDING,
+        expires_at: new Date(Date.now() + 86400000),
+        group: group as Group,
+      };
+      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      usersService.findByEmail.mockResolvedValue(null);
+      usersService.create.mockResolvedValue(created as User);
+      membersRepository.findOne.mockResolvedValue(null);
+
+      await service.acceptInvitation('auto', {});
+
+      expect(usersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'john.doe@ntu.edu' }),
+      );
+      const createCall = usersService.create.mock.calls[0][0];
+      expect(createCall.full_name).toBeDefined();
+    });
   });
 
   describe('validateInvitationToken', () => {
@@ -762,6 +852,18 @@ describe('InvitationsService', () => {
       await expect(
         service.findGroupInvitationsForLeader(groupId, leaderId),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('returns invitations when requester is the leader', async () => {
+      groupsRepository.findOne.mockResolvedValue(group as Group);
+      invitationsRepository.find.mockResolvedValue([
+        { id: invitationId, email, status: InvitationStatus.PENDING } as GroupInvitation,
+      ]);
+
+      const result = await service.findGroupInvitationsForLeader(groupId, leaderId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].email).toBe(email);
     });
   });
 });

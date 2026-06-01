@@ -217,6 +217,85 @@ describe('GoogleCalendarService', () => {
     });
   });
 
+  describe('createSecondaryCalendar — edge cases', () => {
+    it('returns null when summary is empty string', async () => {
+      const result = await service.createSecondaryCalendar('tok', '');
+      expect(result).toBeNull();
+      expect(calendarsInsertMock).not.toHaveBeenCalled();
+    });
+
+    it('returns null when summary is all whitespace', async () => {
+      const result = await service.createSecondaryCalendar('tok', '   ');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('createEventWithMeetLink — extractMeetLink fallback', () => {
+    it('returns any video URI when no meet.google.com URI found', async () => {
+      insertMock.mockResolvedValue({
+        data: {
+          id: 'evt-other',
+          htmlLink: 'https://calendar.google.com/e?eid=x',
+          conferenceData: {
+            entryPoints: [
+              { entryPointType: 'video', uri: 'https://zoom.us/j/123456' },
+            ],
+          },
+        },
+      });
+
+      const result = await service.createEventWithMeetLink('tok', {
+        summary: 'Test',
+        description: 'D',
+        start: new Date(),
+        end: new Date(),
+        attendeeEmails: [],
+      });
+
+      expect(result.meet_link).toBe('https://zoom.us/j/123456');
+    });
+  });
+
+  describe('listEventsInRange — meet_link extraction', () => {
+    it('uses location as meet_link when it contains meet.google.com', async () => {
+      listMock.mockResolvedValue({
+        data: {
+          items: [{
+            id: 'e1',
+            summary: 'Meeting',
+            htmlLink: 'https://cal.com',
+            start: { dateTime: '2026-06-01T10:00:00.000Z' },
+            end: { dateTime: '2026-06-01T11:00:00.000Z' },
+            location: 'https://meet.google.com/abc-xyz',
+          }],
+        },
+      });
+
+      const rows = await service.listEventsInRange('tok', 'cal@g.com', new Date(), new Date());
+
+      expect(rows[0].meet_link).toBe('https://meet.google.com/abc-xyz');
+    });
+
+    it('returns null meet_link when no hangout, conference, or meet location', async () => {
+      listMock.mockResolvedValue({
+        data: {
+          items: [{
+            id: 'e2',
+            summary: 'Offline',
+            htmlLink: 'https://cal.com',
+            start: { date: '2026-06-01' },
+            end: { date: '2026-06-02' },
+            location: 'Library',
+          }],
+        },
+      });
+
+      const rows = await service.listEventsInRange('tok', 'cal@g.com', new Date(), new Date());
+
+      expect(rows[0].meet_link).toBeNull();
+    });
+  });
+
   describe('createGroupCalendarEvent', () => {
     it('offline: sets location from place and appends map URL to description', async () => {
       insertMock.mockResolvedValue({
@@ -281,6 +360,109 @@ describe('GoogleCalendarService', () => {
       );
       expect(callArg.requestBody.conferenceData).toBeUndefined();
       expect(result.meet_link).toBe('https://meet.google.com/aaa-bbbb-ccc');
+    });
+
+    it('offline without maps_url: no map appended to description', async () => {
+      insertMock.mockResolvedValue({ data: { id: 'off2', htmlLink: 'https://cal.com' } });
+
+      await service.createGroupCalendarEvent('tok', {
+        calendarId: 'cal@g.com',
+        summary: 'Meet',
+        description: 'Desc',
+        start: new Date('2026-07-01T12:00:00.000Z'),
+        end: new Date('2026-07-01T14:00:00.000Z'),
+        attendeeEmails: [],
+        mode: 'offline',
+        place_name: 'Library',
+      });
+
+      const callArg = insertMock.mock.calls[0][0] as { requestBody: Record<string, unknown> };
+      expect(callArg.requestBody.description).toBe('Desc');
+      expect(callArg.requestBody.location).toBe('Library');
+    });
+
+    it('offline with only address_detail (no place_name): location is detail', async () => {
+      insertMock.mockResolvedValue({ data: { id: 'off3', htmlLink: 'https://cal.com' } });
+
+      await service.createGroupCalendarEvent('tok', {
+        calendarId: 'cal@g.com',
+        summary: 'Meet',
+        description: 'Desc',
+        start: new Date('2026-07-01T12:00:00.000Z'),
+        end: new Date('2026-07-01T14:00:00.000Z'),
+        attendeeEmails: [],
+        mode: 'offline',
+        address_detail: 'Room 301',
+      });
+
+      const callArg = insertMock.mock.calls[0][0] as { requestBody: Record<string, unknown> };
+      expect(callArg.requestBody.location).toBe('Room 301');
+    });
+
+    it('offline with neither place_name nor address_detail: no location key', async () => {
+      insertMock.mockResolvedValue({ data: { id: 'off4', htmlLink: 'https://cal.com' } });
+
+      await service.createGroupCalendarEvent('tok', {
+        calendarId: 'cal@g.com',
+        summary: 'Meet',
+        description: 'Desc',
+        start: new Date('2026-07-01T12:00:00.000Z'),
+        end: new Date('2026-07-01T14:00:00.000Z'),
+        attendeeEmails: [],
+        mode: 'offline',
+      });
+
+      const callArg = insertMock.mock.calls[0][0] as { requestBody: Record<string, unknown> };
+      expect(callArg.requestBody.location).toBeUndefined();
+    });
+
+    it('online group_meet_link without static_meet_url throws', async () => {
+      await expect(
+        service.createGroupCalendarEvent('tok', {
+          calendarId: 'cal@g.com',
+          summary: 'Sync',
+          description: 'd',
+          start: new Date(),
+          end: new Date(),
+          attendeeEmails: [],
+          mode: 'online',
+          online_option: 'group_meet_link',
+        }),
+      ).rejects.toThrow(/Missing Meet URL/);
+    });
+
+    it('online with invalid option throws', async () => {
+      await expect(
+        service.createGroupCalendarEvent('tok', {
+          calendarId: 'cal@g.com',
+          summary: 'Sync',
+          description: 'd',
+          start: new Date(),
+          end: new Date(),
+          attendeeEmails: [],
+          mode: 'online',
+          online_option: 'invalid_option' as never,
+        }),
+      ).rejects.toThrow(/Invalid online calendar event/);
+    });
+
+    it('one_time_meet throws when no Meet link in API response', async () => {
+      insertMock.mockResolvedValue({
+        data: { id: 'ot2', htmlLink: 'https://cal.com', conferenceData: {} },
+      });
+
+      await expect(
+        service.createGroupCalendarEvent('tok', {
+          calendarId: 'cal@g.com',
+          summary: 'Once',
+          description: 'd',
+          start: new Date(),
+          end: new Date(),
+          attendeeEmails: [],
+          mode: 'online',
+          online_option: 'one_time_meet',
+        }),
+      ).rejects.toThrow(/create a Google Meet link/i);
     });
 
     it('online one_time_meet: creates conference Meet', async () => {

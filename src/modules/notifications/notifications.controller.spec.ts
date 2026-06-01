@@ -9,6 +9,7 @@ describe('NotificationsController', () => {
   let notificationsService: {
     getUserNotifications: ReturnType<typeof vi.fn>;
     markAsRead: ReturnType<typeof vi.fn>;
+    markAllAsRead: ReturnType<typeof vi.fn>;
   };
 
   const userId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -17,6 +18,7 @@ describe('NotificationsController', () => {
     notificationsService = {
       getUserNotifications: vi.fn(),
       markAsRead: vi.fn(),
+      markAllAsRead: vi.fn().mockResolvedValue({ updated: 3 }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -55,6 +57,18 @@ describe('NotificationsController', () => {
       userId,
       undefined,
     );
+  });
+
+  it('markAllAsRead forwards user id to service', async () => {
+    const result = await controller.markAllAsRead({ user: { id: userId } } as never);
+    expect(notificationsService.markAllAsRead).toHaveBeenCalledWith(userId);
+    expect(result).toEqual({ updated: 3 });
+  });
+
+  it('getUserNotifications treats unread=1 same as true', async () => {
+    notificationsService.getUserNotifications.mockResolvedValue([]);
+    await controller.getUserNotifications({ user: { id: userId } } as never, '1');
+    expect(notificationsService.getUserNotifications).toHaveBeenCalledWith(userId, true);
   });
 
   it('markAsRead forwards id and user id', async () => {

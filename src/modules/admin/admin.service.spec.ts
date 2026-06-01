@@ -39,14 +39,15 @@ describe('AdminService', () => {
     email: 'a@ntu.edu.sg',
     full_name: 'Alice',
     avatar_url: null,
-    role: UserRole.USER,
+    role: { id: 'user-role-id', role_name: UserRole.USER },
     is_active: true,
     created_at: new Date(),
     updated_at: new Date(),
-  } as User;
+  } as unknown as User;
 
   beforeEach(async () => {
     const qbUsers = {
+      leftJoinAndSelect: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockReturnThis(),
       skip: vi.fn().mockReturnThis(),
       take: vi.fn().mockReturnThis(),
@@ -144,7 +145,7 @@ describe('AdminService', () => {
   it('lockUser forbids targeting admin', async () => {
     usersRepo.findOne.mockResolvedValue({
       ...user,
-      role: UserRole.ADMIN,
+      role: { id: 'admin-role-id', role_name: UserRole.ADMIN },
     });
     await expect(service.lockUser('u1')).rejects.toThrow(ForbiddenException);
   });
@@ -178,5 +179,36 @@ describe('AdminService', () => {
     const out = await service.findAllGroups(0, 20);
     expect(out.groups[0].member_count).toBe(2);
     expect(out.total).toBe(5);
+  });
+
+  it('lockUser throws NotFoundException when user not found', async () => {
+    usersRepo.findOne.mockResolvedValue(null);
+    await expect(service.lockUser('missing')).rejects.toThrow(NotFoundException);
+  });
+
+  it('unlockUser sets is_active to true', async () => {
+    const inactiveUser = { ...user, is_active: false };
+    usersRepo.findOne.mockResolvedValue(inactiveUser);
+    usersRepo.save.mockImplementation((u: typeof user) => Promise.resolve({ ...u, is_active: true }));
+
+    const out = await service.unlockUser('u1');
+
+    expect(out.is_active).toBe(true);
+    expect(out.locked).toBe(false);
+  });
+
+  it('unlockUser throws NotFoundException when user not found', async () => {
+    usersRepo.findOne.mockResolvedValue(null);
+    await expect(service.unlockUser('missing')).rejects.toThrow(NotFoundException);
+  });
+
+  it('findAllUsers applies search filter when query provided', async () => {
+    await service.findAllUsers(0, 20, 'alice');
+
+    const qb = usersRepo.createQueryBuilder.mock.results[0].value;
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining('ILIKE'),
+      expect.objectContaining({ term: '%alice%' }),
+    );
   });
 });

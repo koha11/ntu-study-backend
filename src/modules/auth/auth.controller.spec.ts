@@ -260,7 +260,9 @@ describe('AuthController', () => {
         expect(controller.googleAuth).toBeDefined();
       });
 
-      // GoogleAuthGuard handles the redirect, controller is just stub
+      it('returns undefined (redirect is handled by GoogleAuthGuard)', () => {
+        expect(controller.googleAuth()).toBeUndefined();
+      });
     });
   });
 
@@ -268,6 +270,15 @@ describe('AuthController', () => {
     describe('refreshToken', () => {
       it('should be defined', () => {
         expect(controller.refreshToken).toBeDefined();
+      });
+
+      it('delegates to authService.refreshToken and returns tokens', async () => {
+        authService.refreshToken.mockResolvedValue(mockLoginResponse);
+
+        const result = await controller.refreshToken({ refresh_token: 'some-refresh-token' } as any);
+
+        expect(authService.refreshToken).toHaveBeenCalledWith('some-refresh-token');
+        expect(result).toEqual(mockLoginResponse);
       });
     });
   });

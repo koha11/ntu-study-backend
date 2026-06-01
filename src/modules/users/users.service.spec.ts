@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { User } from '@modules/users/entities/user.entity';
+import { Role } from '@modules/users/entities/role.entity';
 import { UsersService } from './users.service';
 import { UserRole } from '@common/enums';
 
@@ -14,13 +15,17 @@ describe('UsersService', () => {
     update: ReturnType<typeof vi.fn>;
     increment: ReturnType<typeof vi.fn>;
   };
+  let mockRoleRepository: { findOne: ReturnType<typeof vi.fn> };
 
-  const mockUser: User = {
+  const mockRole: Role = { id: 'role-id', role_name: UserRole.USER };
+
+  const mockUser = {
     id: '550e8400-e29b-41d4-a716-446655440000',
     email: 'user@example.com',
     full_name: 'Test User',
     avatar_url: 'https://example.com/avatar.jpg',
-    role: UserRole.USER,
+    role_id: 'role-id',
+    role: mockRole,
     google_access_token: 'access-token',
     google_refresh_token: 'refresh-token',
     token_expires_at: new Date(Date.now() + 3600000),
@@ -30,7 +35,7 @@ describe('UsersService', () => {
     refresh_token_version: 0,
     created_at: new Date(),
     updated_at: new Date(),
-  } as User;
+  } as unknown as User;
 
   beforeEach(async () => {
     mockUserRepository = {
@@ -40,6 +45,7 @@ describe('UsersService', () => {
       update: vi.fn(),
       increment: vi.fn().mockResolvedValue(undefined),
     };
+    mockRoleRepository = { findOne: vi.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -47,6 +53,10 @@ describe('UsersService', () => {
         {
           provide: getRepositoryToken(User),
           useValue: mockUserRepository,
+        },
+        {
+          provide: getRepositoryToken(Role),
+          useValue: mockRoleRepository,
         },
       ],
     }).compile();
@@ -67,6 +77,7 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
       expect(mockUserRepository.findOne).toHaveBeenCalledWith({
         where: { id: mockUser.id },
+        relations: { role: true },
       });
     });
 
@@ -88,28 +99,7 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
       expect(mockUserRepository.findOne).toHaveBeenCalledWith({
         where: { id: mockUser.id },
-        select: [
-          'id',
-          'email',
-          'full_name',
-          'avatar_url',
-          'role',
-          'google_access_token',
-          'google_refresh_token',
-          'token_expires_at',
-          'drive_total_quota',
-          'drive_used_quota',
-          'quota_last_updated',
-          'is_active',
-          'notification_enabled',
-          'preferred_language',
-          'last_login_at',
-          'canva_access_token',
-          'canva_refresh_token',
-          'canva_token_expires_at',
-          'created_at',
-          'updated_at',
-        ],
+        relations: { role: true },
       });
     });
 
@@ -121,6 +111,7 @@ describe('UsersService', () => {
       expect(result).not.toHaveProperty('hashed_refresh_token');
       expect(mockUserRepository.findOne).toHaveBeenCalledWith({
         where: { id: mockUser.id },
+        relations: { role: true },
       });
     });
   });
@@ -134,6 +125,7 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
       expect(mockUserRepository.findOne).toHaveBeenCalledWith({
         where: { email: mockUser.email },
+        relations: { role: true },
       });
     });
 
@@ -152,6 +144,7 @@ describe('UsersService', () => {
 
       expect(mockUserRepository.findOne).toHaveBeenCalledWith({
         where: { email: 'USER@EXAMPLE.COM' },
+        relations: { role: true },
       });
     });
   });
@@ -161,7 +154,7 @@ describe('UsersService', () => {
       const newUserData: Partial<User> = {
         email: 'newuser@example.com',
         full_name: 'New User',
-        role: UserRole.USER,
+        role_id: 'role-id',
         is_active: true,
       };
 
@@ -226,6 +219,7 @@ describe('UsersService', () => {
       );
       expect(mockUserRepository.findOne).toHaveBeenCalledWith({
         where: { id: mockUser.id },
+        relations: { role: true },
       });
       expect(result).toEqual({ ...mockUser, ...updateData });
     });

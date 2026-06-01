@@ -236,5 +236,68 @@ describe('UsersController', () => {
         controller.syncGoogleProfile({ user: { id: mockUserId } }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('throws NotFoundException when user not found initially', async () => {
+      usersService.findById.mockResolvedValue(null);
+
+      await expect(
+        controller.syncGoogleProfile({ user: { id: mockUserId } }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequest when Google userinfo fetch fails', async () => {
+      usersService.findById.mockResolvedValue(mockUser);
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('tok');
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+
+      await expect(
+        controller.syncGoogleProfile({ user: { id: mockUserId } }),
+      ).rejects.toThrow(BadRequestException);
+
+      vi.unstubAllGlobals();
+    });
+
+    it('throws NotFoundException when user not found after update', async () => {
+      usersService.findById.mockResolvedValue(mockUser);
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('tok');
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ name: 'Test', picture: 'https://p.jpg' }),
+      }));
+      usersService.update.mockResolvedValue(mockUser);
+      usersService.findOne.mockResolvedValue(null);
+
+      await expect(
+        controller.syncGoogleProfile({ user: { id: mockUserId } }),
+      ).rejects.toThrow(NotFoundException);
+
+      vi.unstubAllGlobals();
+    });
+
+    it('uses existing full_name when name not in Google response', async () => {
+      usersService.findById.mockResolvedValue(mockUser);
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('tok');
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      }));
+      usersService.update.mockResolvedValue(mockUser);
+      usersService.findOne.mockResolvedValue(mockUser);
+
+      await controller.syncGoogleProfile({ user: { id: mockUserId } });
+
+      expect(usersService.update).toHaveBeenCalledWith(
+        mockUserId,
+        expect.objectContaining({ full_name: mockUser.full_name }),
+      );
+      vi.unstubAllGlobals();
+    });
+  });
+
+  describe('GET /users/:id', () => {
+    it('getUser returns empty object (stub)', async () => {
+      const result = await controller.getUser('some-id');
+      expect(result).toEqual({});
+    });
   });
 });

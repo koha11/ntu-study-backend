@@ -4,6 +4,7 @@ import { validate } from 'class-validator';
 import {
   CreateGroupCalendarEventDto,
   CreateGroupDto,
+  CreateMeetEventDto,
   InviteMemberDto,
   ListGroupCalendarEventsQueryDto,
   UpdateGroupDto,
@@ -126,6 +127,24 @@ describe('group.dto', () => {
       place_name: 'Hall A',
     });
     expect(await validate(dto)).toHaveLength(0);
+  });
+
+  it('CreateMeetEventDto validates valid end date (triggers @ValidateIf callback)', async () => {
+    const dto = plainToInstance(CreateMeetEventDto, {
+      start: '2026-06-01T10:00:00.000Z',
+      end: '2026-06-01T11:00:00.000Z',
+    });
+    const errors = await validate(dto);
+    expect(errors.filter((e) => e.property === 'end')).toHaveLength(0);
+  });
+
+  it('CreateMeetEventDto rejects invalid end date string', async () => {
+    const dto = plainToInstance(CreateMeetEventDto, {
+      start: '2026-06-01T10:00:00.000Z',
+      end: 'not-a-date',
+    });
+    const errors = await validate(dto);
+    expect(errors.find((e) => e.property === 'end')).toBeDefined();
   });
 
   it('CreateGroupCalendarEventDto validates online group_meet_link', async () => {
