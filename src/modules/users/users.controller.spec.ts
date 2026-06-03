@@ -4,8 +4,9 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
-import { UserRole } from '@common/enums';
+import { Language, UserRole } from '@common/enums';
 import type { User } from './entities/user.entity';
+import type { Role } from './entities/role.entity';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -20,12 +21,15 @@ describe('UsersController', () => {
 
   const mockUserId = '550e8400-e29b-41d4-a716-446655440000';
 
+  const mockRole: Role = { id: 'role-uuid', role_name: UserRole.USER };
+
   const baseMockUser = {
     id: mockUserId,
     email: 'user@example.com',
     full_name: 'Test User',
     avatar_url: 'https://example.com/a.jpg',
-    role: UserRole.USER,
+    role: mockRole,
+    preferred_language: Language.VI,
     notification_enabled: true,
     created_at: new Date('2026-01-01'),
     updated_at: new Date('2026-01-02'),
@@ -81,7 +85,8 @@ describe('UsersController', () => {
           email: mockUser.email,
           full_name: mockUser.full_name,
           avatar_url: mockUser.avatar_url,
-          role: mockUser.role,
+          role: mockRole.role_name,
+          preferred_language: mockUser.preferred_language,
           notification_enabled: true,
           canva_connected: false,
           drive_total_quota: null,
