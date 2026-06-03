@@ -32,7 +32,7 @@ function toProfileResponse(user: User) {
     email: user.email,
     full_name: user.full_name,
     avatar_url: user.avatar_url ?? null,
-    role: user.role,
+    role: user.role?.role_name,
     notification_enabled: user.notification_enabled,
     preferred_language: user.preferred_language,
     canva_connected: canvaConnected(user),
