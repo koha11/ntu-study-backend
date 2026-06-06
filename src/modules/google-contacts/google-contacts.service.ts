@@ -9,8 +9,6 @@ import { UsersService } from '@modules/users/users.service';
 import { User } from '@modules/users/entities/user.entity';
 
 const TOKEN_EXPIRY_BUFFER_MS = 120_000;
-/** otherContacts.search caps pageSize at 30 */
-const MAX_SEARCH_PAGE_SIZE = 30;
 const MAX_SUGGESTIONS = 15;
 
 export interface ContactSuggestion {
@@ -94,16 +92,17 @@ export class GoogleContactsService {
     oauth2.setCredentials({ access_token: accessToken });
     const peopleClient = google.people({ version: 'v1', auth: oauth2 });
 
-    let results: people_v1.Schema$SearchResult[] = [];
+    let people: people_v1.Schema$Person[] = [];
 
     try {
-      /** REST: GET …/v1/otherContacts:search — Google uses prefix-oriented matching; we still substring-filter returned rows. */
-      const res = await peopleClient.otherContacts.search({
+      const res = await peopleClient.people.searchDirectoryPeople({
         query: q,
-        readMask: 'names,emailAddresses',
-        pageSize: Math.min(MAX_SUGGESTIONS, MAX_SEARCH_PAGE_SIZE),
+        readMask: 'names,emailAddresses,photos',
+        pageSize: MAX_SUGGESTIONS,
+        sources: ['DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE'],
+        mergeSources: ['DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT'],
       });
-      results = res.data.results ?? [];
+      people = res.data.people ?? [];
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (
@@ -113,7 +112,7 @@ export class GoogleContactsService {
           msg.toLowerCase().includes('permission'))
       ) {
         throw new ForbiddenException(
-          'Cannot read Google contacts. Sign out and sign in again to grant contacts access.',
+          'Cannot read Google directory. Sign out and sign in again to grant contacts access.',
         );
       }
       throw new InternalServerErrorException(
@@ -123,8 +122,8 @@ export class GoogleContactsService {
 
     const seen = new Set<string>();
     const all: ContactSuggestion[] = [];
-    for (const hit of results) {
-      const row = hit.person ? personToContact(hit.person) : null;
+    for (const person of people) {
+      const row = personToContact(person);
       if (!row) {
         continue;
       }
