@@ -16,6 +16,7 @@ import { User } from '@modules/users/entities/user.entity';
 import { UsersService } from '@modules/users/users.service';
 import { EmailService } from '@common/services/email.service';
 import { GoogleDriveService } from '@common/services/google-drive.service';
+import { GoogleCalendarService } from '@common/services/google-calendar.service';
 import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
 import { DataSource } from 'typeorm';
 import { InvitationStatus, UserRole } from '@common/enums';
@@ -56,6 +57,7 @@ describe('InvitationsService', () => {
   const inviteeUserId = 'uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu';
   let configService: { get: ReturnType<typeof vi.fn> };
   let googleDriveService: { shareFile: ReturnType<typeof vi.fn> };
+  let googleCalendarService: { shareCalendarWithUser: ReturnType<typeof vi.fn> };
   let googleAccessTokenService: {
     resolveGoogleAccessToken: ReturnType<typeof vi.fn>;
   };
@@ -135,6 +137,10 @@ describe('InvitationsService', () => {
       shareFile: vi.fn(),
     };
 
+    googleCalendarService = {
+      shareCalendarWithUser: vi.fn().mockResolvedValue(true),
+    };
+
     googleAccessTokenService = {
       resolveGoogleAccessToken: vi.fn(),
     };
@@ -168,6 +174,7 @@ describe('InvitationsService', () => {
         { provide: EmailService, useValue: emailService },
         { provide: ConfigService, useValue: configService },
         { provide: GoogleDriveService, useValue: googleDriveService },
+        { provide: GoogleCalendarService, useValue: googleCalendarService },
         {
           provide: GoogleAccessTokenService,
           useValue: googleAccessTokenService,
@@ -603,6 +610,84 @@ describe('InvitationsService', () => {
       expect(invitationsRepository.save).not.toHaveBeenCalledWith(
         expect.objectContaining({ status: InvitationStatus.ACCEPTED }),
       );
+    });
+
+    it('shares group calendar with the new member when calendar is configured', async () => {
+      const user: Partial<User> = { id: inviteeUserId, email, full_name: 'Invitee', role: UserRole.USER, is_active: true, notification_enabled: true, created_at: new Date(), updated_at: new Date() };
+      const groupWithCalendar: Partial<Group> = { ...group, google_calendar_id: 'cal-id@group.calendar.google.com' };
+      const invitation: Partial<GroupInvitation> = {
+        token: 'acc-cal',
+        group_id: groupId,
+        email,
+        status: InvitationStatus.PENDING,
+        expires_at: new Date(Date.now() + 86400000),
+        group: groupWithCalendar as Group,
+      };
+
+      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      usersService.findByEmail.mockResolvedValue(user as User);
+      membersRepository.findOne.mockResolvedValue(null);
+      usersService.findById.mockResolvedValue(inviter as User);
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('leader-token');
+
+      await service.acceptInvitation('acc-cal', {});
+
+      expect(googleCalendarService.shareCalendarWithUser).toHaveBeenCalledWith(
+        'leader-token',
+        'cal-id@group.calendar.google.com',
+        email,
+      );
+      expect(membersRepository.save).toHaveBeenCalled();
+    });
+
+    it('does not block invitation when calendar sharing fails', async () => {
+      const user: Partial<User> = { id: inviteeUserId, email, full_name: 'Invitee', role: UserRole.USER, is_active: true, notification_enabled: true, created_at: new Date(), updated_at: new Date() };
+      const groupWithCalendar: Partial<Group> = { ...group, google_calendar_id: 'cal-id@group.calendar.google.com' };
+      const invitation: Partial<GroupInvitation> = {
+        token: 'acc-cal-fail',
+        group_id: groupId,
+        email,
+        status: InvitationStatus.PENDING,
+        expires_at: new Date(Date.now() + 86400000),
+        group: groupWithCalendar as Group,
+      };
+
+      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      usersService.findByEmail.mockResolvedValue(user as User);
+      membersRepository.findOne.mockResolvedValue(null);
+      usersService.findById.mockResolvedValue(inviter as User);
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('leader-token');
+      googleCalendarService.shareCalendarWithUser.mockResolvedValue(false);
+
+      const result = await service.acceptInvitation('acc-cal-fail', {});
+
+      expect(result.user.id).toBe(inviteeUserId);
+      expect(membersRepository.save).toHaveBeenCalled();
+    });
+
+    it('skips calendar sharing when leader has no access token', async () => {
+      const user: Partial<User> = { id: inviteeUserId, email, full_name: 'Invitee', role: UserRole.USER, is_active: true, notification_enabled: true, created_at: new Date(), updated_at: new Date() };
+      const groupWithCalendar: Partial<Group> = { ...group, google_calendar_id: 'cal-id@group.calendar.google.com' };
+      const invitation: Partial<GroupInvitation> = {
+        token: 'acc-cal-no-tok',
+        group_id: groupId,
+        email,
+        status: InvitationStatus.PENDING,
+        expires_at: new Date(Date.now() + 86400000),
+        group: groupWithCalendar as Group,
+      };
+
+      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      usersService.findByEmail.mockResolvedValue(user as User);
+      membersRepository.findOne.mockResolvedValue(null);
+      usersService.findById.mockResolvedValue(inviter as User);
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(null);
+
+      const result = await service.acceptInvitation('acc-cal-no-tok', {});
+
+      expect(googleCalendarService.shareCalendarWithUser).not.toHaveBeenCalled();
+      expect(result.user.id).toBe(inviteeUserId);
+      expect(membersRepository.save).toHaveBeenCalled();
     });
 
     it('throws when leader has no Google access token for sharing', async () => {

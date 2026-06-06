@@ -17,6 +17,7 @@ import { UsersService } from '@modules/users/users.service';
 import { EmailService } from '@common/services/email.service';
 import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 import { GoogleDriveService } from '@common/services/google-drive.service';
+import { GoogleCalendarService } from '@common/services/google-calendar.service';
 import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
 import { InvitationStatus } from '@common/enums';
 import { NotificationsService } from '@modules/notifications/notifications.service';
@@ -63,6 +64,7 @@ export class InvitationsService {
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
     private readonly googleDriveService: GoogleDriveService,
+    private readonly googleCalendarService: GoogleCalendarService,
     private readonly googleAccessTokenService: GoogleAccessTokenService,
     private readonly notificationsService: NotificationsService,
     private readonly groupEmailThreadService: GroupEmailThreadService,
@@ -377,23 +379,31 @@ export class InvitationsService {
     }
 
     const folderId = invitation.group?.drive_folder_id?.trim();
-    if (folderId) {
+    const calendarId = invitation.group?.google_calendar_id?.trim();
+
+    let leaderAccessToken: string | null = null;
+    if (folderId || calendarId) {
       const leader = await this.usersService.findById(
         invitation.group.leader_id,
         true,
       );
-      if (!leader) {
+      if (!leader && folderId) {
         throw new BadRequestException('Group leader not found');
       }
-      const accessToken =
-        await this.googleAccessTokenService.resolveGoogleAccessToken(leader);
-      if (!accessToken) {
-        throw new BadRequestException(
-          'Cannot complete invitation: the group leader must reconnect Google so the Drive folder can be shared.',
-        );
+      if (leader) {
+        leaderAccessToken =
+          await this.googleAccessTokenService.resolveGoogleAccessToken(leader);
+        if (!leaderAccessToken && folderId) {
+          throw new BadRequestException(
+            'Cannot complete invitation: the group leader must reconnect Google so the Drive folder can be shared.',
+          );
+        }
       }
+    }
+
+    if (folderId) {
       const shareResult: unknown = await this.googleDriveService.shareFile(
-        accessToken,
+        leaderAccessToken!,
         folderId,
         email,
         'writer',
@@ -403,6 +413,14 @@ export class InvitationsService {
           'Could not share the group Drive folder with this email. Try again or contact the group leader.',
         );
       }
+    }
+
+    if (calendarId && leaderAccessToken) {
+      await this.googleCalendarService.shareCalendarWithUser(
+        leaderAccessToken,
+        calendarId,
+        email,
+      );
     }
 
     const member = this.membersRepository.create({

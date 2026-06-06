@@ -350,22 +350,46 @@ export class GroupsService {
       throw new BadRequestException('time_max must be after time_min');
     }
 
+    // Prefer the viewer's own token so reads are decoupled from the leader's session.
+    // The calendar is shared with members on invitation acceptance, so their token has access.
+    const viewer = await this.usersService.findById(viewerUserId, true);
+    const viewerToken = viewer
+      ? await this.googleAccessTokenService.resolveGoogleAccessToken(viewer)
+      : null;
+
+    if (viewerToken) {
+      try {
+        return await this.googleCalendarService.listEventsInRange(
+          viewerToken,
+          calendarId,
+          timeMin,
+          timeMax,
+        );
+      } catch {
+        // Viewer may not have ACL yet (joined before calendar sharing was enabled).
+        // Fall through to leader token.
+      }
+    }
+
+    // Fallback: leader's token (covers members who joined before sharing was enabled).
     const leader = await this.usersService.findById(group.leader_id, true);
     if (!leader) {
       throw new NotFoundException('Group leader not found');
     }
 
-    const accessToken =
+    const leaderToken =
       await this.googleAccessTokenService.resolveGoogleAccessToken(leader);
-    if (!accessToken) {
+    if (!leaderToken) {
       throw new ForbiddenException(
-        'Google Calendar access is unavailable for the group leader. The leader may need to sign in again.',
+        viewerToken
+          ? 'Google Calendar access is unavailable. Ask the group leader to sign in with Google again.'
+          : 'Google Calendar access is unavailable. Please sign in with Google to access the group calendar.',
       );
     }
 
     try {
       return await this.googleCalendarService.listEventsInRange(
-        accessToken,
+        leaderToken,
         calendarId,
         timeMin,
         timeMax,

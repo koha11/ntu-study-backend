@@ -95,6 +95,31 @@ export class GoogleCalendarService {
   }
 
   /**
+   * Grants reader access on a calendar to a specific email via ACL.
+   * Returns true on success, false on failure (best-effort — callers should not throw on false).
+   */
+  async shareCalendarWithUser(
+    accessToken: string,
+    calendarId: string,
+    email: string,
+  ): Promise<boolean> {
+    try {
+      const calendar = this.getCalendarClient(accessToken);
+      await calendar.acl.insert({
+        calendarId,
+        requestBody: { role: 'reader', scope: { type: 'user', value: email } },
+      });
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Failed to share calendar ${calendarId} with ${email}: ${message}`,
+      );
+      return false;
+    }
+  }
+
+  /**
    * Lists events in a calendar within [timeMin, timeMax).
    */
   async listEventsInRange(
