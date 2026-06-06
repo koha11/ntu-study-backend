@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
@@ -24,6 +25,7 @@ export interface GoogleUserProfile {
  */
 @Injectable()
 export class GoogleTokenExchangeService {
+  private readonly logger = new Logger(GoogleTokenExchangeService.name);
   private oauth2Client: OAuth2Client;
 
   constructor(private configService: ConfigService) {
@@ -102,6 +104,7 @@ export class GoogleTokenExchangeService {
           : undefined,
       };
 
+      this.logger.log(`Google OAuth code exchange successful for ${googleProfile.email}`);
       return googleProfile;
     } catch (error) {
       // Distinguish between client errors and server errors
@@ -161,6 +164,7 @@ export class GoogleTokenExchangeService {
       );
     }
     const creds = this.oauth2Client.credentials;
+    this.logger.log('Google access token refreshed successfully');
     return {
       access_token: token,
       expiry_date: creds.expiry_date ? new Date(creds.expiry_date) : undefined,

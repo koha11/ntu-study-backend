@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
@@ -12,6 +13,8 @@ import { User } from '@modules/users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
@@ -50,6 +53,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
     const { accessToken, refreshToken } = await this.getTokens(full);
+    this.logger.log(`User logged in: ${user.id} (${user.email})`);
     return { access_token: accessToken, refresh_token: refreshToken };
   }
 
@@ -59,6 +63,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
     const { accessToken, refreshToken } = await this.getTokens(user);
+    this.logger.log(`User logged in by ID: ${userId}`);
     return { access_token: accessToken, refresh_token: refreshToken };
   }
 
@@ -105,22 +110,26 @@ export class AuthService {
         });
       }
 
+      this.logger.log(`Google OAuth completed for user ${user.id} (${googleProfile.email})`);
       return user.id;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
       if (error instanceof Error) {
+        this.logger.error(`Google auth failed: ${error.message}`);
         throw new InternalServerErrorException(
           `Google authentication failed: ${error.message}`,
         );
       }
+      this.logger.error('Google auth failed: unknown error');
       throw new InternalServerErrorException('Google authentication failed');
     }
   }
 
   async logout(user: { id: string }): Promise<void> {
     await this.usersService.incrementRefreshTokenVersion(user.id);
+    this.logger.log(`User logged out: ${user.id}`);
   }
 
   async refreshToken(refreshTokenValue: string): Promise<LoginResponseDto> {
@@ -155,6 +164,7 @@ export class AuthService {
     }
     const { accessToken, refreshToken: newRefresh } =
       await this.getTokens(user);
+    this.logger.log(`Token refreshed for user ${userId}`);
     return { access_token: accessToken, refresh_token: newRefresh };
   }
 }

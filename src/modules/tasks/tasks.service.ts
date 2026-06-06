@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -31,6 +32,8 @@ const TASK_DETAIL_RELATIONS = [
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     @InjectRepository(Task)
     private readonly tasksRepository: Repository<Task>,
@@ -98,6 +101,7 @@ export class TasksService {
         relations: [...TASK_DETAIL_RELATIONS],
       })) ?? saved;
     await this.maybeNotifyGroupTaskAssigned(reloaded, userId);
+    this.logger.log(`Task created: "${reloaded.title}" (id=${reloaded.id}) by user ${userId}`);
     return reloaded;
   }
 
@@ -220,6 +224,7 @@ export class TasksService {
         userId,
       );
     }
+    this.logger.log(`Task ${id} updated by user ${userId}`);
     return reloaded;
   }
 
@@ -240,6 +245,7 @@ export class TasksService {
     task.submitted_at = new Date();
     await this.tasksRepository.save(task);
     const reloaded = await this.reloadTaskWithRelations(id);
+    this.logger.log(`Task ${id} submitted for review by user ${userId}`);
     await this.maybeNotifyLeaderPendingReview(reloaded, userId);
     return reloaded;
   }
@@ -279,6 +285,7 @@ export class TasksService {
     task.reviewed_by_id = leaderId;
     await this.tasksRepository.save(task);
     const reloaded = await this.reloadTaskWithRelations(id);
+    this.logger.log(`Task ${id} ${status} by leader ${leaderId}`);
     await this.maybeNotifyAssigneeReviewResult(reloaded, group, status, comment);
     return reloaded;
   }
@@ -305,6 +312,7 @@ export class TasksService {
     }
 
     await this.tasksRepository.remove(task);
+    this.logger.log(`Task ${id} deleted by user ${userId}`);
   }
 
   async findOverdueTasks(): Promise<Task[]> {

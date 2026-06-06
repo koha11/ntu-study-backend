@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
@@ -6,6 +6,8 @@ import { NotificationDeliveryChannel } from '@common/enums';
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     @InjectRepository(Notification)
     private notificationsRepository: Repository<Notification>,
@@ -20,6 +22,7 @@ export class NotificationsService {
         >
       >,
   ): Promise<Notification> {
+    this.logger.log(`Creating notification for ${data.recipient_id}: type=${data.type}`);
     const notification = this.notificationsRepository.create({
       recipient_id: data.recipient_id,
       type: data.type,
@@ -50,6 +53,7 @@ export class NotificationsService {
       { recipient_id: userId, is_read: false },
       { is_read: true },
     );
+    this.logger.log(`All notifications marked as read for user ${userId}`);
   }
 
   async markAsRead(id: string, userId: string): Promise<Notification> {
@@ -60,6 +64,7 @@ export class NotificationsService {
       throw new NotFoundException('Notification not found');
     }
     notification.is_read = true;
+    this.logger.log(`Notification ${id} marked as read for user ${userId}`);
     return this.notificationsRepository.save(notification);
   }
 }

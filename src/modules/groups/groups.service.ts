@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -53,6 +54,8 @@ export interface MemberRow {
 
 @Injectable()
 export class GroupsService {
+  private readonly logger = new Logger(GroupsService.name);
+
   constructor(
     @InjectRepository(Group)
     private readonly groupsRepository: Repository<Group>,
@@ -162,6 +165,7 @@ export class GroupsService {
       }
     }
 
+    this.logger.log(`Group created: "${saved.name}" (id=${saved.id}) by leader ${leaderId}`);
     return saved;
   }
 
@@ -266,6 +270,7 @@ export class GroupsService {
         group.google_calendar_id = dto.google_calendar_id.trim();
       }
     }
+    this.logger.log(`Group ${groupId} updated by user ${actingUserId}`);
     return this.groupsRepository.save(group);
   }
 
@@ -668,6 +673,7 @@ export class GroupsService {
         throw new ConflictException('User is already a member of this group');
       }
     }
+    this.logger.log(`Inviting ${email} to group ${groupId} by leader ${leaderId}`);
     return this.invitationsService.createInvitation({
       groupId,
       invitedByUserId: leaderId,
@@ -693,6 +699,7 @@ export class GroupsService {
       throw new NotFoundException('Member not found in this group');
     }
     member.is_active = !member.is_active;
+    this.logger.log(`Member ${targetUserId} in group ${groupId} toggled to active=${member.is_active} by ${leaderId}`);
     return this.membersRepository.save(member);
   }
 
@@ -713,6 +720,7 @@ export class GroupsService {
       throw new NotFoundException('Member not found in this group');
     }
     await this.membersRepository.remove(member);
+    this.logger.log(`Member ${targetUserId} removed from group ${groupId} by ${leaderId}`);
   }
 
   private async requireGroup(groupId: string): Promise<Group> {

@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -58,6 +59,8 @@ export type AdminDashboardDto = {
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     @InjectRepository(User) private usersRepository: Repository<User>,
     @InjectRepository(Group) private groupsRepository: Repository<Group>,
@@ -120,6 +123,7 @@ export class AdminService {
     }
     user.is_active = false;
     await this.usersRepository.save(user);
+    this.logger.log(`User ${userId} locked by admin`);
     return {
       id: user.id,
       email: user.email,
@@ -141,6 +145,7 @@ export class AdminService {
     }
     user.is_active = true;
     await this.usersRepository.save(user);
+    this.logger.log(`User ${userId} unlocked by admin`);
     return {
       id: user.id,
       email: user.email,
@@ -195,6 +200,7 @@ export class AdminService {
     if (!res.affected) {
       throw new NotFoundException('Group not found');
     }
+    this.logger.log(`Group ${groupId} deleted by admin`);
   }
 
   async getDashboard(): Promise<AdminDashboardDto> {

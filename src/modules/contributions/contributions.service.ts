@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -50,6 +51,8 @@ export interface MemberTaskScore {
 
 @Injectable()
 export class ContributionsService {
+  private readonly logger = new Logger(ContributionsService.name);
+
   constructor(
     @InjectRepository(ContributionRating)
     private readonly ratingsRepository: Repository<ContributionRating>,
@@ -234,6 +237,7 @@ export class ContributionsService {
     }
 
     await this.ratingsRepository.save(rows);
+    this.logger.log(`Evaluation round opened for group ${groupId}: ${rows.length} ratings created`);
 
     await this.notifyMembersEvaluationOpened(
       groupId,
@@ -311,6 +315,7 @@ export class ContributionsService {
       activeUserIds,
     );
 
+    this.logger.log(`Evaluation round closed for group ${groupId}: ${result.affected} ratings updated`);
     return { updated: result.affected };
   }
 
@@ -520,6 +525,7 @@ export class ContributionsService {
 
     row.score = score;
     await this.ratingsRepository.save(row);
+    this.logger.log(`Rating submitted for task ${taskId} in group ${groupId} by rater ${raterId}: score ${score}`);
     return { ok: true };
   }
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Group } from '@modules/groups/entities/group.entity';
@@ -22,6 +22,8 @@ const DRIVE_PAGE_SIZE = 5;
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
+
   constructor(
     @InjectRepository(Group)
     private readonly groupsRepository: Repository<Group>,
@@ -36,6 +38,7 @@ export class DashboardService {
   ) {}
 
   async getDashboard(userId: string): Promise<DashboardResponseDto> {
+    this.logger.log(`Dashboard requested for user ${userId}`);
     const user = await this.usersService.findById(userId, true);
     const accessToken = user
       ? await this.googleAccessTokenService.resolveGoogleAccessToken(user)

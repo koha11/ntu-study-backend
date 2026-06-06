@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { google, type people_v1 } from 'googleapis';
@@ -62,6 +63,8 @@ export function contactMatchesQuery(c: ContactSuggestion, q: string): boolean {
 
 @Injectable()
 export class GoogleContactsService {
+  private readonly logger = new Logger(GoogleContactsService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly googleTokenExchange: GoogleTokenExchangeService,
@@ -75,6 +78,9 @@ export class GoogleContactsService {
     if (!q) {
       return [];
     }
+    this.logger.debug(
+      `Searching contacts with query "${q}" for user ${userId}`,
+    );
 
     const user = await this.usersService.findById(userId, true);
     if (!user) {
@@ -111,10 +117,16 @@ export class GoogleContactsService {
           msg.toLowerCase().includes('insufficient') ||
           msg.toLowerCase().includes('permission'))
       ) {
+        this.logger.error(
+          `Google directory search permission denied for user ${userId}: ${msg}`,
+        );
         throw new ForbiddenException(
           'Cannot read Google directory. Sign out and sign in again to grant contacts access.',
         );
       }
+      this.logger.error(
+        `Google Contacts request failed for user ${userId}: ${msg}`,
+      );
       throw new InternalServerErrorException(
         `Google Contacts request failed: ${msg}`,
       );
@@ -138,6 +150,9 @@ export class GoogleContactsService {
       all.push(row);
     }
 
+    this.logger.debug(
+      `Found ${all.length} contact suggestion(s) for query "${q}"`,
+    );
     return all.slice(0, MAX_SUGGESTIONS);
   }
 
@@ -164,8 +179,12 @@ export class GoogleContactsService {
         google_access_token: refreshed.access_token,
         token_expires_at: refreshed.expiry_date,
       });
+      this.logger.debug(`Google access token refreshed for user ${user.id}`);
       return refreshed.access_token;
     } catch {
+      this.logger.error(
+        `Failed to refresh Google access token for user ${user.id}`,
+      );
       return null;
     }
   }

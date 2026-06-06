@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -6,6 +6,8 @@ import { Role } from './entities/role.entity';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User) private usersRepository: Repository<User>,
     @InjectRepository(Role) private rolesRepository: Repository<Role>,
@@ -51,12 +53,14 @@ export class UsersService {
   }
 
   async create(userData: Partial<User>): Promise<User> {
+    this.logger.log(`Creating user: ${userData.email ?? 'unknown'}`);
     const user = this.usersRepository.create(userData);
     return this.usersRepository.save(user);
   }
 
   async update(id: string, userData: Partial<User>): Promise<User> {
     await this.usersRepository.update(id, userData);
+    this.logger.log(`User updated: ${id}`);
     const updatedUser = await this.findOne(id);
     if (!updatedUser) {
       throw new Error(`User with id ${id} not found after update`);
@@ -73,6 +77,7 @@ export class UsersService {
   /** Revokes all refresh JWTs for this user (session invalidation). */
   async incrementRefreshTokenVersion(id: string): Promise<void> {
     await this.usersRepository.increment({ id }, 'refresh_token_version', 1);
+    this.logger.debug(`Refresh token version incremented for user ${id}`);
   }
 
   /** Reserved for opaque refresh-token storage if added later; revocation uses `refresh_token_version`. */

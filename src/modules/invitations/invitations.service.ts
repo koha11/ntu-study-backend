@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -52,6 +53,8 @@ export interface ResendGroupInvitationParams {
 
 @Injectable()
 export class InvitationsService {
+  private readonly logger = new Logger(InvitationsService.name);
+
   constructor(
     @InjectRepository(GroupInvitation)
     private readonly invitationsRepository: Repository<GroupInvitation>,
@@ -162,6 +165,7 @@ export class InvitationsService {
       expires_at: expiresAt,
     });
     const saved = await invRepo.save(invitation);
+    this.logger.log(`Invitation created for ${normalized} to group ${groupId}`);
 
     return { saved, group, existingInviteeId };
   }
@@ -432,6 +436,7 @@ export class InvitationsService {
 
     invitation.status = InvitationStatus.ACCEPTED;
     await this.invitationsRepository.save(invitation);
+    this.logger.log(`Invitation accepted: user ${user.id} (${email}) joined group ${invitation.group_id}`);
 
     return { user };
   }

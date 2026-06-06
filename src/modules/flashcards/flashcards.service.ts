@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
@@ -67,6 +68,8 @@ export type SharedFlashcardSetRow = {
 
 @Injectable()
 export class FlashcardsService {
+  private readonly logger = new Logger(FlashcardsService.name);
+
   constructor(
     @InjectRepository(FlashcardSet)
     private setsRepository: Repository<FlashcardSet>,
@@ -91,7 +94,9 @@ export class FlashcardsService {
       description: data.description ?? null,
       card_count: 0,
     });
-    return this.setsRepository.save(entity);
+    const saved = await this.setsRepository.save(entity);
+    this.logger.log(`Flashcard set created: "${data.name}" (id=${saved.id}) for user ${userId}`);
+    return saved;
   }
 
   private async isSetAccessibleByUser(setId: string, userId: string): Promise<boolean> {
@@ -169,6 +174,7 @@ export class FlashcardsService {
     });
     const saved = await this.cardsRepository.save(card);
     await this.setsRepository.increment({ id: setId }, 'card_count', 1);
+    this.logger.log(`Flashcard added (id=${saved.id}) to set ${setId} for user ${userId}`);
     return saved;
   }
 
@@ -187,6 +193,7 @@ export class FlashcardsService {
     if (data.name !== undefined) set.name = data.name;
     if (data.subject !== undefined) set.subject = data.subject;
     if (data.description !== undefined) set.description = data.description;
+    this.logger.log(`Flashcard set ${setId} updated for user ${userId}`);
     return this.setsRepository.save(set);
   }
 
@@ -223,6 +230,7 @@ export class FlashcardsService {
       throw new ForbiddenException('You do not own this flashcard set');
     }
     await this.setsRepository.remove(set);
+    this.logger.log(`Flashcard set ${setId} deleted for user ${userId}`);
   }
 
   async removeFlashcard(
@@ -310,7 +318,9 @@ export class FlashcardsService {
       score: data.score,
       next_review_at: nextAt,
     });
-    return this.studyLogsRepository.save(log);
+    const saved = await this.studyLogsRepository.save(log);
+    this.logger.log(`Study session completed: set ${setId} score ${data.score} for user ${userId}`);
+    return saved;
   }
 
   async shareSetWithGroup(
@@ -341,7 +351,9 @@ export class FlashcardsService {
     }
 
     const record = this.sharedRepository.create({ set_id: setId, group_id: groupId });
-    return this.sharedRepository.save(record);
+    const saved = await this.sharedRepository.save(record);
+    this.logger.log(`Flashcard set ${setId} shared with group ${groupId} by user ${userId}`);
+    return saved;
   }
 
   async unshareSetFromGroup(
@@ -364,6 +376,7 @@ export class FlashcardsService {
       throw new NotFoundException('Shared record not found');
     }
     await this.sharedRepository.remove(record);
+    this.logger.log(`Flashcard set ${setId} unshared from group ${groupId} by user ${userId}`);
   }
 
   async getGroupSharedSets(
