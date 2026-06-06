@@ -106,7 +106,6 @@ export class GoogleContactsService {
         readMask: 'names,emailAddresses,photos',
         pageSize: MAX_SUGGESTIONS,
         sources: ['DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE'],
-        mergeSources: ['DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT'],
       });
       people = res.data.people ?? [];
     } catch (err: unknown) {
