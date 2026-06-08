@@ -20,6 +20,7 @@ import { GroupEmailThreadService } from '@common/services/group-email-thread.ser
 import { GoogleDriveService } from '@common/services/google-drive.service';
 import { GoogleCalendarService } from '@common/services/google-calendar.service';
 import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
+import { AuthService } from '@modules/auth/auth.service';
 import { InvitationStatus } from '@common/enums';
 import { NotificationsService } from '@modules/notifications/notifications.service';
 import {
@@ -71,6 +72,7 @@ export class InvitationsService {
     private readonly googleAccessTokenService: GoogleAccessTokenService,
     private readonly notificationsService: NotificationsService,
     private readonly groupEmailThreadService: GroupEmailThreadService,
+    private readonly authService: AuthService,
   ) {}
 
   async createInvitation(
@@ -331,7 +333,7 @@ export class InvitationsService {
   async acceptInvitation(
     token: string,
     body?: { full_name?: string },
-  ): Promise<{ user: User }> {
+  ): Promise<{ user: User; access_token: string; refresh_token: string }> {
     const invitation = await this.invitationsRepository.findOne({
       where: { token },
       relations: ['group'],
@@ -361,6 +363,10 @@ export class InvitationsService {
 
     let user = await this.usersService.findByEmail(email);
     if (!user) {
+      const defaultRole = await this.usersService.findRoleByName('user');
+      if (!defaultRole) {
+        throw new BadRequestException('Default role not found');
+      }
       const fullName =
         body?.full_name?.trim() ||
         email
@@ -370,6 +376,7 @@ export class InvitationsService {
       user = await this.usersService.create({
         email,
         full_name: fullName,
+        role_id: defaultRole.id,
         is_active: true,
         notification_enabled: true,
       });
@@ -438,7 +445,9 @@ export class InvitationsService {
     await this.invitationsRepository.save(invitation);
     this.logger.log(`Invitation accepted: user ${user.id} (${email}) joined group ${invitation.group_id}`);
 
-    return { user };
+    const { access_token, refresh_token } =
+      await this.authService.loginByUserId(user.id);
+    return { user, access_token, refresh_token };
   }
 
   /**
