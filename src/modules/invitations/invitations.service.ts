@@ -20,7 +20,6 @@ import { GroupEmailThreadService } from '@common/services/group-email-thread.ser
 import { GoogleDriveService } from '@common/services/google-drive.service';
 import { GoogleCalendarService } from '@common/services/google-calendar.service';
 import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
-import { AuthService } from '@modules/auth/auth.service';
 import { InvitationStatus } from '@common/enums';
 import { NotificationsService } from '@modules/notifications/notifications.service';
 import {
@@ -72,7 +71,6 @@ export class InvitationsService {
     private readonly googleAccessTokenService: GoogleAccessTokenService,
     private readonly notificationsService: NotificationsService,
     private readonly groupEmailThreadService: GroupEmailThreadService,
-    private readonly authService: AuthService,
   ) {}
 
   async createInvitation(
@@ -333,7 +331,7 @@ export class InvitationsService {
   async acceptInvitation(
     token: string,
     body?: { full_name?: string },
-  ): Promise<{ user: User; access_token: string; refresh_token: string }> {
+  ): Promise<{ user: User }> {
     const invitation = await this.invitationsRepository.findOne({
       where: { token },
       relations: ['group'],
@@ -445,9 +443,7 @@ export class InvitationsService {
     await this.invitationsRepository.save(invitation);
     this.logger.log(`Invitation accepted: user ${user.id} (${email}) joined group ${invitation.group_id}`);
 
-    const { access_token, refresh_token } =
-      await this.authService.loginByUserId(user.id);
-    return { user, access_token, refresh_token };
+    return { user };
   }
 
   /**
