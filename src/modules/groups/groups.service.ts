@@ -165,8 +165,50 @@ export class GroupsService {
       }
     }
 
-    this.logger.log(`Group created: "${saved.name}" (id=${saved.id}) by leader ${leaderId}`);
-    return saved;
+    this.logger.log(
+      `Group created: "${saved.name}" (id=${saved.id}) by leader ${leaderId}`,
+    );
+
+    const failedInvitations: { email: string; reason: string }[] = [];
+    for (const raw of dto.initial_member_emails ?? []) {
+      const reason = await this.createInitialInvitation(
+        saved.id,
+        leaderId,
+        raw,
+      );
+      if (reason !== null) {
+        failedInvitations.push({ email: raw, reason });
+      }
+    }
+
+    return { group: saved, failedInvitations };
+  }
+
+  private async createInitialInvitation(
+    groupId: string,
+    invitedByUserId: string,
+    email: string,
+  ): Promise<string | null> {
+    try {
+      const normalized = email.trim().toLowerCase();
+      const existingUser = await this.usersService.findByEmail(normalized);
+      if (existingUser) {
+        const existingMembership = await this.membersRepository.findOne({
+          where: { group_id: groupId, user_id: existingUser.id },
+        });
+        if (existingMembership) {
+          return 'User is already a member of this group';
+        }
+      }
+      await this.invitationsService.createInvitation({
+        groupId,
+        invitedByUserId,
+        email: normalized,
+      });
+      return null;
+    } catch (err: unknown) {
+      return err instanceof Error ? err.message : 'Failed to send invitation';
+    }
   }
 
   async findUserGroups(userId: string): Promise<GroupSummary[]> {
@@ -673,7 +715,9 @@ export class GroupsService {
         throw new ConflictException('User is already a member of this group');
       }
     }
-    this.logger.log(`Inviting ${email} to group ${groupId} by leader ${leaderId}`);
+    this.logger.log(
+      `Inviting ${email} to group ${groupId} by leader ${leaderId}`,
+    );
     return this.invitationsService.createInvitation({
       groupId,
       invitedByUserId: leaderId,
@@ -699,7 +743,9 @@ export class GroupsService {
       throw new NotFoundException('Member not found in this group');
     }
     member.is_active = !member.is_active;
-    this.logger.log(`Member ${targetUserId} in group ${groupId} toggled to active=${member.is_active} by ${leaderId}`);
+    this.logger.log(
+      `Member ${targetUserId} in group ${groupId} toggled to active=${member.is_active} by ${leaderId}`,
+    );
     return this.membersRepository.save(member);
   }
 
@@ -720,7 +766,9 @@ export class GroupsService {
       throw new NotFoundException('Member not found in this group');
     }
     await this.membersRepository.remove(member);
-    this.logger.log(`Member ${targetUserId} removed from group ${groupId} by ${leaderId}`);
+    this.logger.log(
+      `Member ${targetUserId} removed from group ${groupId} by ${leaderId}`,
+    );
   }
 
   private async requireGroup(groupId: string): Promise<Group> {

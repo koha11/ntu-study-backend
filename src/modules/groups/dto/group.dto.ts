@@ -37,6 +37,13 @@ export class CreateGroupDto {
   @ValidateIf((_, v) => typeof v === 'string' && v.length > 0)
   @IsDateString({ strict: true })
   report_date?: string;
+
+  /** Emails to invite immediately after group creation (best-effort). */
+  @IsArray()
+  @IsOptional()
+  @IsEmail({}, { each: true })
+  @ArrayMaxSize(50)
+  initial_member_emails?: string[];
 }
 
 export class UpdateGroupDto {

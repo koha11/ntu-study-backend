@@ -53,9 +53,10 @@ export class GroupsController {
     },
   })
   @ApiResponse({ status: 400, description: 'Invalid input' })
-  create(@Req() req: Request, @Body() createGroupDto: CreateGroupDto) {
+  async create(@Req() req: Request, @Body() createGroupDto: CreateGroupDto) {
     const user = req.user as JwtRequestUser;
-    return this.groupsService.create(user.id, createGroupDto);
+    const { group, failedInvitations } = await this.groupsService.create(user.id, createGroupDto);
+    return { ...group, failed_invitations: failedInvitations };
   }
 
   @Get()
