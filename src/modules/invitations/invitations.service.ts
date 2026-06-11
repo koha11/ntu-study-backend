@@ -441,7 +441,9 @@ export class InvitationsService {
 
     invitation.status = InvitationStatus.ACCEPTED;
     await this.invitationsRepository.save(invitation);
-    this.logger.log(`Invitation accepted: user ${user.id} (${email}) joined group ${invitation.group_id}`);
+    this.logger.log(
+      `Invitation accepted: user ${user.id} (${email}) joined group ${invitation.group_id}`,
+    );
 
     return { user };
   }

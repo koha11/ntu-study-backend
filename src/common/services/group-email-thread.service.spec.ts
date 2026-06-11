@@ -21,14 +21,22 @@ describe('GroupEmailThreadService', () => {
       findOne: vi.fn(),
       create: vi.fn((data) => ({ ...data })),
       save: vi.fn((data) =>
-        Promise.resolve({ id: 'thread-uuid-1', created_at: new Date(), updated_at: new Date(), ...data }),
+        Promise.resolve({
+          id: 'thread-uuid-1',
+          created_at: new Date(),
+          updated_at: new Date(),
+          ...data,
+        }),
       ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GroupEmailThreadService,
-        { provide: getRepositoryToken(GroupEmailThread), useValue: threadsRepository },
+        {
+          provide: getRepositoryToken(GroupEmailThread),
+          useValue: threadsRepository,
+        },
       ],
     }).compile();
 

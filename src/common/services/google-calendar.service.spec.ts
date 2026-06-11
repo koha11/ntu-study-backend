@@ -260,18 +260,25 @@ describe('GoogleCalendarService', () => {
     it('uses location as meet_link when it contains meet.google.com', async () => {
       listMock.mockResolvedValue({
         data: {
-          items: [{
-            id: 'e1',
-            summary: 'Meeting',
-            htmlLink: 'https://cal.com',
-            start: { dateTime: '2026-06-01T10:00:00.000Z' },
-            end: { dateTime: '2026-06-01T11:00:00.000Z' },
-            location: 'https://meet.google.com/abc-xyz',
-          }],
+          items: [
+            {
+              id: 'e1',
+              summary: 'Meeting',
+              htmlLink: 'https://cal.com',
+              start: { dateTime: '2026-06-01T10:00:00.000Z' },
+              end: { dateTime: '2026-06-01T11:00:00.000Z' },
+              location: 'https://meet.google.com/abc-xyz',
+            },
+          ],
         },
       });
 
-      const rows = await service.listEventsInRange('tok', 'cal@g.com', new Date(), new Date());
+      const rows = await service.listEventsInRange(
+        'tok',
+        'cal@g.com',
+        new Date(),
+        new Date(),
+      );
 
       expect(rows[0].meet_link).toBe('https://meet.google.com/abc-xyz');
     });
@@ -279,18 +286,25 @@ describe('GoogleCalendarService', () => {
     it('returns null meet_link when no hangout, conference, or meet location', async () => {
       listMock.mockResolvedValue({
         data: {
-          items: [{
-            id: 'e2',
-            summary: 'Offline',
-            htmlLink: 'https://cal.com',
-            start: { date: '2026-06-01' },
-            end: { date: '2026-06-02' },
-            location: 'Library',
-          }],
+          items: [
+            {
+              id: 'e2',
+              summary: 'Offline',
+              htmlLink: 'https://cal.com',
+              start: { date: '2026-06-01' },
+              end: { date: '2026-06-02' },
+              location: 'Library',
+            },
+          ],
         },
       });
 
-      const rows = await service.listEventsInRange('tok', 'cal@g.com', new Date(), new Date());
+      const rows = await service.listEventsInRange(
+        'tok',
+        'cal@g.com',
+        new Date(),
+        new Date(),
+      );
 
       expect(rows[0].meet_link).toBeNull();
     });
@@ -363,7 +377,9 @@ describe('GoogleCalendarService', () => {
     });
 
     it('offline without maps_url: no map appended to description', async () => {
-      insertMock.mockResolvedValue({ data: { id: 'off2', htmlLink: 'https://cal.com' } });
+      insertMock.mockResolvedValue({
+        data: { id: 'off2', htmlLink: 'https://cal.com' },
+      });
 
       await service.createGroupCalendarEvent('tok', {
         calendarId: 'cal@g.com',
@@ -376,13 +392,17 @@ describe('GoogleCalendarService', () => {
         place_name: 'Library',
       });
 
-      const callArg = insertMock.mock.calls[0][0] as { requestBody: Record<string, unknown> };
+      const callArg = insertMock.mock.calls[0][0] as {
+        requestBody: Record<string, unknown>;
+      };
       expect(callArg.requestBody.description).toBe('Desc');
       expect(callArg.requestBody.location).toBe('Library');
     });
 
     it('offline with only address_detail (no place_name): location is detail', async () => {
-      insertMock.mockResolvedValue({ data: { id: 'off3', htmlLink: 'https://cal.com' } });
+      insertMock.mockResolvedValue({
+        data: { id: 'off3', htmlLink: 'https://cal.com' },
+      });
 
       await service.createGroupCalendarEvent('tok', {
         calendarId: 'cal@g.com',
@@ -395,12 +415,16 @@ describe('GoogleCalendarService', () => {
         address_detail: 'Room 301',
       });
 
-      const callArg = insertMock.mock.calls[0][0] as { requestBody: Record<string, unknown> };
+      const callArg = insertMock.mock.calls[0][0] as {
+        requestBody: Record<string, unknown>;
+      };
       expect(callArg.requestBody.location).toBe('Room 301');
     });
 
     it('offline with neither place_name nor address_detail: no location key', async () => {
-      insertMock.mockResolvedValue({ data: { id: 'off4', htmlLink: 'https://cal.com' } });
+      insertMock.mockResolvedValue({
+        data: { id: 'off4', htmlLink: 'https://cal.com' },
+      });
 
       await service.createGroupCalendarEvent('tok', {
         calendarId: 'cal@g.com',
@@ -412,7 +436,9 @@ describe('GoogleCalendarService', () => {
         mode: 'offline',
       });
 
-      const callArg = insertMock.mock.calls[0][0] as { requestBody: Record<string, unknown> };
+      const callArg = insertMock.mock.calls[0][0] as {
+        requestBody: Record<string, unknown>;
+      };
       expect(callArg.requestBody.location).toBeUndefined();
     });
 

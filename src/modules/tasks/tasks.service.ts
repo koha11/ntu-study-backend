@@ -11,7 +11,7 @@ import { IsNull, Repository } from 'typeorm';
 import { Task } from './entities/task.entity';
 import { GroupMember } from '@modules/groups/entities/group-member.entity';
 import { Group } from '@modules/groups/entities/group.entity';
-import { TaskStatus } from '@common/enums';
+import { GroupStatus, TaskStatus } from '@common/enums';
 import type { CreateTaskDto, UpdateTaskDto } from './dto/task.dto';
 import { NotificationsService } from '@modules/notifications/notifications.service';
 import { UsersService } from '@modules/users/users.service';
@@ -81,6 +81,7 @@ export class TasksService {
 
     if (groupId) {
       await this.assertActiveMember(groupId, userId);
+      await this.assertGroupNotLocked(groupId);
     }
 
     const task = this.tasksRepository.create({
@@ -101,7 +102,9 @@ export class TasksService {
         relations: [...TASK_DETAIL_RELATIONS],
       })) ?? saved;
     await this.maybeNotifyGroupTaskAssigned(reloaded, userId);
-    this.logger.log(`Task created: "${reloaded.title}" (id=${reloaded.id}) by user ${userId}`);
+    this.logger.log(
+      `Task created: "${reloaded.title}" (id=${reloaded.id}) by user ${userId}`,
+    );
     return reloaded;
   }
 
@@ -184,6 +187,9 @@ export class TasksService {
       throw new NotFoundException('Task not found');
     }
     await this.assertCanEditTask(task, userId);
+    if (task.group_id) {
+      await this.assertGroupNotLocked(task.group_id);
+    }
 
     const previousAssigneeId = task.assignee_id;
 
@@ -286,7 +292,12 @@ export class TasksService {
     await this.tasksRepository.save(task);
     const reloaded = await this.reloadTaskWithRelations(id);
     this.logger.log(`Task ${id} ${status} by leader ${leaderId}`);
-    await this.maybeNotifyAssigneeReviewResult(reloaded, group, status, comment);
+    await this.maybeNotifyAssigneeReviewResult(
+      reloaded,
+      group,
+      status,
+      comment,
+    );
     return reloaded;
   }
 
@@ -300,6 +311,11 @@ export class TasksService {
       const group = await this.groupsRepository.findOne({
         where: { id: task.group_id },
       });
+      if (group?.status === GroupStatus.LOCKED) {
+        throw new ForbiddenException(
+          'This group is locked and cannot be modified',
+        );
+      }
       const isLeader = group?.leader_id === userId;
       const isCreator = task.created_by_id === userId;
       if (!isLeader && !isCreator) {
@@ -529,6 +545,18 @@ export class TasksService {
         threadMessageId: thread?.thread_message_id,
         lang: assigneeLang2,
       });
+    }
+  }
+
+  private async assertGroupNotLocked(groupId: string): Promise<void> {
+    const group = await this.groupsRepository.findOne({
+      where: { id: groupId },
+      select: ['id', 'status'],
+    });
+    if (group?.status === GroupStatus.LOCKED) {
+      throw new ForbiddenException(
+        'This group is locked and cannot be modified',
+      );
     }
   }
 

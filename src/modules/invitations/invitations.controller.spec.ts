@@ -134,11 +134,15 @@ describe('InvitationsController', () => {
   });
 
   it('validateToken delegates to invitationsService.validateInvitationToken', async () => {
-    (invitationsService as Record<string, unknown>).validateInvitationToken = vi.fn().mockResolvedValue({ valid: true });
+    (invitationsService as Record<string, unknown>).validateInvitationToken = vi
+      .fn()
+      .mockResolvedValue({ valid: true });
 
     const result = await controller.validateToken('tok-abc');
 
-    expect((invitationsService as Record<string, unknown>).validateInvitationToken).toHaveBeenCalledWith('tok-abc');
+    expect(
+      (invitationsService as Record<string, unknown>).validateInvitationToken,
+    ).toHaveBeenCalledWith('tok-abc');
     expect(result).toEqual({ valid: true });
   });
 

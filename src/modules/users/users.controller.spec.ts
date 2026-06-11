@@ -252,7 +252,9 @@ describe('UsersController', () => {
 
     it('throws BadRequest when Google userinfo fetch fails', async () => {
       usersService.findById.mockResolvedValue(mockUser);
-      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('tok');
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(
+        'tok',
+      );
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
       await expect(
@@ -264,11 +266,17 @@ describe('UsersController', () => {
 
     it('throws NotFoundException when user not found after update', async () => {
       usersService.findById.mockResolvedValue(mockUser);
-      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('tok');
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ name: 'Test', picture: 'https://p.jpg' }),
-      }));
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(
+        'tok',
+      );
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({ name: 'Test', picture: 'https://p.jpg' }),
+        }),
+      );
       usersService.update.mockResolvedValue(mockUser);
       usersService.findOne.mockResolvedValue(null);
 
@@ -281,11 +289,16 @@ describe('UsersController', () => {
 
     it('uses existing full_name when name not in Google response', async () => {
       usersService.findById.mockResolvedValue(mockUser);
-      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('tok');
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({}),
-      }));
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(
+        'tok',
+      );
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({}),
+        }),
+      );
       usersService.update.mockResolvedValue(mockUser);
       usersService.findOne.mockResolvedValue(mockUser);
 

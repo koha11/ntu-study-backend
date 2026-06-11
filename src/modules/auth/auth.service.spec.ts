@@ -232,13 +232,15 @@ describe('AuthService', () => {
 
     describe('error handling', () => {
       it('throws InternalServerError when default user role is not found', async () => {
-        googleTokenExchange.exchangeCodeAndVerify.mockResolvedValue(mockGoogleProfile);
+        googleTokenExchange.exchangeCodeAndVerify.mockResolvedValue(
+          mockGoogleProfile,
+        );
         usersService.findByEmail.mockResolvedValue(null);
         usersService.findRoleByName.mockResolvedValue(null);
 
-        await expect(authService.googleAuth({ code: 'c', code_verifier: 'v' })).rejects.toThrow(
-          InternalServerErrorException,
-        );
+        await expect(
+          authService.googleAuth({ code: 'c', code_verifier: 'v' }),
+        ).rejects.toThrow(InternalServerErrorException);
       });
 
       it('should re-throw UnauthorizedException from google token exchange', async () => {
@@ -446,44 +448,46 @@ describe('AuthService', () => {
         throw new Error('jwt malformed');
       });
 
-      await expect(
-        authService.refreshToken('bad-token'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(authService.refreshToken('bad-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('throws UnauthorizedException when decoded has no sub property', async () => {
       jwtService.verify.mockReturnValueOnce({ email: 'only@email.com' });
 
-      await expect(
-        authService.refreshToken('no-sub'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(authService.refreshToken('no-sub')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('throws UnauthorizedException when decoded is null', async () => {
       jwtService.verify.mockReturnValueOnce(null);
 
-      await expect(
-        authService.refreshToken('null-decoded'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(authService.refreshToken('null-decoded')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('throws UnauthorizedException when user not found', async () => {
       usersService.findOne.mockResolvedValue(null);
 
-      await expect(
-        authService.refreshToken('valid-token'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(authService.refreshToken('valid-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
   describe('googleAuth — non-Error exception', () => {
     it('throws InternalServerError when error is a non-Error thrown value', async () => {
-      googleTokenExchange.exchangeCodeAndVerify.mockResolvedValue(mockGoogleProfile);
+      googleTokenExchange.exchangeCodeAndVerify.mockResolvedValue(
+        mockGoogleProfile,
+      );
       usersService.findByEmail.mockRejectedValue('string error');
 
-      await expect(authService.googleAuth({ code: 'c', redirectUri: 'r' })).rejects.toThrow(
-        InternalServerErrorException,
-      );
+      await expect(
+        authService.googleAuth({ code: 'c', redirectUri: 'r' }),
+      ).rejects.toThrow(InternalServerErrorException);
     });
   });
 });

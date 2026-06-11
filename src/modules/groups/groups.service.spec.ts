@@ -153,12 +153,17 @@ describe('GroupsService', () => {
     };
 
     emailService = {
-      sendGroupCreatedEmail: vi.fn().mockResolvedValue('<created@ntu-study.local>'),
+      sendGroupCreatedEmail: vi
+        .fn()
+        .mockResolvedValue('<created@ntu-study.local>'),
     };
 
     groupEmailThreadService = {
       findByGroupAndUser: vi.fn().mockResolvedValue(null),
-      create: vi.fn().mockResolvedValue({ id: 'thread-1', thread_message_id: '<created@ntu-study.local>' }),
+      create: vi.fn().mockResolvedValue({
+        id: 'thread-1',
+        thread_message_id: '<created@ntu-study.local>',
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -180,7 +185,10 @@ describe('GroupsService', () => {
         },
         { provide: EmailService, useValue: emailService },
         { provide: GroupEmailThreadService, useValue: groupEmailThreadService },
-        { provide: ConfigService, useValue: { get: vi.fn().mockReturnValue('http://localhost:5173') } },
+        {
+          provide: ConfigService,
+          useValue: { get: vi.fn().mockReturnValue('http://localhost:5173') },
+        },
       ],
     }).compile();
 
@@ -306,9 +314,7 @@ describe('GroupsService', () => {
     });
 
     it('skips calendar provisioning when Google token cannot be resolved', async () => {
-      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(
-        null,
-      );
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(null);
 
       const result = await service.create(leaderId, { name: 'NoTok' });
 
@@ -796,11 +802,23 @@ describe('GroupsService', () => {
 
     it('throws ForbiddenException when leader has no Google access token', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', status: 'active',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        status: 'active',
       } as Group);
-      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true });
-      membersRepository.find.mockResolvedValue([{ user_id: leaderId, is_active: true, user: { email: 'l@t.com' } }]);
-      usersService.findById.mockResolvedValue({ id: leaderId, email: 'l@t.com', google_access_token: null });
+      membersRepository.findOne.mockResolvedValue({
+        user_id: leaderId,
+        is_active: true,
+      });
+      membersRepository.find.mockResolvedValue([
+        { user_id: leaderId, is_active: true, user: { email: 'l@t.com' } },
+      ]);
+      usersService.findById.mockResolvedValue({
+        id: leaderId,
+        email: 'l@t.com',
+        google_access_token: null,
+      });
       googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(null);
 
       await expect(
@@ -810,11 +828,20 @@ describe('GroupsService', () => {
 
     it('throws ForbiddenException when createEventWithMeetLink throws grant-calendar error', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', status: 'active',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        status: 'active',
       } as Group);
       membersRepository.findOne.mockResolvedValue({ user_id: leaderId });
-      membersRepository.find.mockResolvedValue([{ user_id: leaderId, is_active: true, user: { email: 'l@t.com' } }]);
-      usersService.findById.mockResolvedValue({ id: leaderId, email: 'l@t.com', google_access_token: 'tok' });
+      membersRepository.find.mockResolvedValue([
+        { user_id: leaderId, is_active: true, user: { email: 'l@t.com' } },
+      ]);
+      usersService.findById.mockResolvedValue({
+        id: leaderId,
+        email: 'l@t.com',
+        google_access_token: 'tok',
+      });
       googleCalendarService.createEventWithMeetLink.mockRejectedValue(
         new Error('Please sign in again to grant calendar permission'),
       );
@@ -826,14 +853,26 @@ describe('GroupsService', () => {
 
     it('uses default 1-hour end time when end_time not provided', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', status: 'active',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        status: 'active',
       } as Group);
       membersRepository.findOne.mockResolvedValue({ user_id: leaderId });
-      membersRepository.find.mockResolvedValue([{ user_id: leaderId, is_active: true, user: { email: 'l@t.com' } }]);
-      usersService.findById.mockResolvedValue({ id: leaderId, email: 'l@t.com', google_access_token: 'tok' });
+      membersRepository.find.mockResolvedValue([
+        { user_id: leaderId, is_active: true, user: { email: 'l@t.com' } },
+      ]);
+      usersService.findById.mockResolvedValue({
+        id: leaderId,
+        email: 'l@t.com',
+        google_access_token: 'tok',
+      });
       googleCalendarService.createEventWithMeetLink.mockResolvedValue({
-        event_id: 'evt1', meet_link: 'https://meet.google.com/abc', html_link: 'https://cal.com',
-        start: '2026-06-01T10:00:00Z', end: '2026-06-01T11:00:00Z',
+        event_id: 'evt1',
+        meet_link: 'https://meet.google.com/abc',
+        html_link: 'https://cal.com',
+        start: '2026-06-01T10:00:00Z',
+        end: '2026-06-01T11:00:00Z',
       });
 
       const result = await service.createMeetEventAndInvite(groupId, leaderId, {
@@ -847,33 +886,58 @@ describe('GroupsService', () => {
 
     it('throws NotFoundException when leader user not found', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', status: 'active',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        status: 'active',
       } as Group);
       membersRepository.findOne.mockResolvedValue({ user_id: leaderId });
       // Provide at least one active member with email to pass the "no members" check
-      membersRepository.find.mockResolvedValue([{
-        user_id: leaderId, is_active: true, user: { email: 'l@t.com' },
-      }]);
+      membersRepository.find.mockResolvedValue([
+        {
+          user_id: leaderId,
+          is_active: true,
+          user: { email: 'l@t.com' },
+        },
+      ]);
       usersService.findById.mockResolvedValue(null);
 
       await expect(
-        service.createMeetEventAndInvite(groupId, leaderId, { title: 'Sync', start: '2026-06-01T10:00:00Z' } as never),
+        service.createMeetEventAndInvite(groupId, leaderId, {
+          title: 'Sync',
+          start: '2026-06-01T10:00:00Z',
+        } as never),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('accepts valid explicit end time (covers lines 545-546)', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', status: 'active',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        status: 'active',
       } as Group);
       membersRepository.findOne.mockResolvedValue({ user_id: leaderId });
-      membersRepository.find.mockResolvedValue([{ user_id: leaderId, is_active: true, user: { email: 'l@t.com' } }]);
-      usersService.findById.mockResolvedValue({ id: leaderId, email: 'l@t.com', google_access_token: 'tok' });
+      membersRepository.find.mockResolvedValue([
+        { user_id: leaderId, is_active: true, user: { email: 'l@t.com' } },
+      ]);
+      usersService.findById.mockResolvedValue({
+        id: leaderId,
+        email: 'l@t.com',
+        google_access_token: 'tok',
+      });
       googleCalendarService.createEventWithMeetLink.mockResolvedValue({
-        event_id: 'e1', meet_link: 'https://meet.google.com/abc', html_link: 'h', start: 's', end: 'e',
+        event_id: 'e1',
+        meet_link: 'https://meet.google.com/abc',
+        html_link: 'h',
+        start: 's',
+        end: 'e',
       });
 
       const result = await service.createMeetEventAndInvite(groupId, leaderId, {
-        title: 'Sync', start: '2026-06-01T10:00:00Z', end: '2026-06-01T11:00:00Z',
+        title: 'Sync',
+        start: '2026-06-01T10:00:00Z',
+        end: '2026-06-01T11:00:00Z',
       } as never);
 
       expect(result.meet_link).toBeDefined();
@@ -881,51 +945,76 @@ describe('GroupsService', () => {
 
     it('throws BadRequestException when start time is invalid (covers line 539)', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', status: 'active',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        status: 'active',
       } as Group);
       membersRepository.findOne.mockResolvedValue({ user_id: leaderId });
 
       await expect(
         service.createMeetEventAndInvite(groupId, leaderId, {
-          title: 'Sync', start: 'not-a-date',
+          title: 'Sync',
+          start: 'not-a-date',
         } as never),
       ).rejects.toThrow(/Invalid start time/);
     });
 
     it('throws BadRequestException when end time is invalid (covers line 547)', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', status: 'active',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        status: 'active',
       } as Group);
       membersRepository.findOne.mockResolvedValue({ user_id: leaderId });
 
       await expect(
         service.createMeetEventAndInvite(groupId, leaderId, {
-          title: 'Sync', start: '2026-06-01T10:00:00Z', end: 'not-a-date',
+          title: 'Sync',
+          start: '2026-06-01T10:00:00Z',
+          end: 'not-a-date',
         } as never),
       ).rejects.toThrow(/Invalid end time/);
     });
 
     it('throws BadRequestException when end time is before start time (covers line 554)', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', status: 'active',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        status: 'active',
       } as Group);
       membersRepository.findOne.mockResolvedValue({ user_id: leaderId });
 
       await expect(
         service.createMeetEventAndInvite(groupId, leaderId, {
-          title: 'Sync', start: '2026-06-01T11:00:00Z', end: '2026-06-01T10:00:00Z',
+          title: 'Sync',
+          start: '2026-06-01T11:00:00Z',
+          end: '2026-06-01T10:00:00Z',
         } as never),
       ).rejects.toThrow(/End time must be after start time/);
     });
 
     it('throws BadRequestException when createEventWithMeetLink throws generic error', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', status: 'active',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        status: 'active',
       } as Group);
       membersRepository.findOne.mockResolvedValue({ user_id: leaderId });
-      membersRepository.find.mockResolvedValue([{ user_id: leaderId, is_active: true, user: { email: 'l@t.com' } }]);
-      usersService.findById.mockResolvedValue({ id: leaderId, email: 'l@t.com', google_access_token: 'tok' });
-      googleCalendarService.createEventWithMeetLink.mockRejectedValue(new Error('Calendar quota exceeded'));
+      membersRepository.find.mockResolvedValue([
+        { user_id: leaderId, is_active: true, user: { email: 'l@t.com' } },
+      ]);
+      usersService.findById.mockResolvedValue({
+        id: leaderId,
+        email: 'l@t.com',
+        google_access_token: 'tok',
+      });
+      googleCalendarService.createEventWithMeetLink.mockRejectedValue(
+        new Error('Calendar quota exceeded'),
+      );
 
       await expect(
         service.createMeetEventAndInvite(groupId, leaderId, dto as never),
@@ -944,17 +1033,24 @@ describe('GroupsService', () => {
 
     it('returns mapped group summaries with member counts', async () => {
       membersRepository.find.mockResolvedValue([{ group_id: groupId }]);
-      groupsRepository.find.mockResolvedValue([{
-        id: groupId, name: 'Study Squad', description: 'A group',
-        leader_id: leaderId, created_at: new Date(),
-      }]);
+      groupsRepository.find.mockResolvedValue([
+        {
+          id: groupId,
+          name: 'Study Squad',
+          description: 'A group',
+          leader_id: leaderId,
+          created_at: new Date(),
+        },
+      ]);
       const qb = {
         select: vi.fn().mockReturnThis(),
         addSelect: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
         andWhere: vi.fn().mockReturnThis(),
         groupBy: vi.fn().mockReturnThis(),
-        getRawMany: vi.fn().mockResolvedValue([{ group_id: groupId, cnt: '5' }]),
+        getRawMany: vi
+          .fn()
+          .mockResolvedValue([{ group_id: groupId, cnt: '5' }]),
       };
       membersRepository.createQueryBuilder.mockReturnValue(qb);
 
@@ -971,7 +1067,9 @@ describe('GroupsService', () => {
   describe('findOneForMember', () => {
     it('returns group when user is leader', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
       } as Group);
 
       const result = await service.findOneForMember(groupId, leaderId);
@@ -981,9 +1079,14 @@ describe('GroupsService', () => {
 
     it('returns group when user is an active member', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: 'other-leader', name: 'G',
+        id: groupId,
+        leader_id: 'other-leader',
+        name: 'G',
       } as Group);
-      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true });
+      membersRepository.findOne.mockResolvedValue({
+        user_id: leaderId,
+        is_active: true,
+      });
 
       const result = await service.findOneForMember(groupId, leaderId);
 
@@ -992,7 +1095,9 @@ describe('GroupsService', () => {
 
     it('throws ForbiddenException when user is not a member', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: 'other', name: 'G',
+        id: groupId,
+        leader_id: 'other',
+        name: 'G',
       } as Group);
       membersRepository.findOne.mockResolvedValue(null);
 
@@ -1004,9 +1109,9 @@ describe('GroupsService', () => {
     it('throws NotFoundException when group does not exist', async () => {
       groupsRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.findOneForMember('bad-id', leaderId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.findOneForMember('bad-id', leaderId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -1015,17 +1120,25 @@ describe('GroupsService', () => {
   // ---------------------------------------------------------------------------
   describe('getCanvaPreview', () => {
     const group = {
-      id: groupId, leader_id: leaderId, name: 'G',
+      id: groupId,
+      leader_id: leaderId,
+      name: 'G',
       canva_design_id: 'DA123',
     } as Group;
 
     beforeEach(() => {
       groupsRepository.findOne.mockResolvedValue(group);
-      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true });
+      membersRepository.findOne.mockResolvedValue({
+        user_id: leaderId,
+        is_active: true,
+      });
     });
 
     it('returns empty when group has no canva_design_id', async () => {
-      groupsRepository.findOne.mockResolvedValue({ ...group, canva_design_id: null } as unknown as Group);
+      groupsRepository.findOne.mockResolvedValue({
+        ...group,
+        canva_design_id: null,
+      } as unknown as Group);
 
       const result = await service.getCanvaPreview(groupId, leaderId);
 
@@ -1034,7 +1147,11 @@ describe('GroupsService', () => {
     });
 
     it('returns empty when leader has no canva tokens', async () => {
-      usersService.findById.mockResolvedValue({ id: leaderId, canva_access_token: null, canva_refresh_token: null });
+      usersService.findById.mockResolvedValue({
+        id: leaderId,
+        canva_access_token: null,
+        canva_refresh_token: null,
+      });
 
       const result = await service.getCanvaPreview(groupId, leaderId);
 
@@ -1048,8 +1165,24 @@ describe('GroupsService', () => {
         canva_refresh_token: 'rt',
         canva_token_expires_at: new Date(Date.now() + 3600_000),
       });
-      (canvaService as unknown as { getDesign: ReturnType<typeof vi.fn>; getDesignPages: ReturnType<typeof vi.fn> }).getDesign = vi.fn().mockResolvedValue({ editUrl: 'https://canva.com/edit/DA123' });
-      (canvaService as unknown as { getDesign: ReturnType<typeof vi.fn>; getDesignPages: ReturnType<typeof vi.fn> }).getDesignPages = vi.fn().mockResolvedValue([{ index: 1, thumbnailUrl: 'https://img.canva.com' }]);
+      (
+        canvaService as unknown as {
+          getDesign: ReturnType<typeof vi.fn>;
+          getDesignPages: ReturnType<typeof vi.fn>;
+        }
+      ).getDesign = vi
+        .fn()
+        .mockResolvedValue({ editUrl: 'https://canva.com/edit/DA123' });
+      (
+        canvaService as unknown as {
+          getDesign: ReturnType<typeof vi.fn>;
+          getDesignPages: ReturnType<typeof vi.fn>;
+        }
+      ).getDesignPages = vi
+        .fn()
+        .mockResolvedValue([
+          { index: 1, thumbnailUrl: 'https://img.canva.com' },
+        ]);
 
       const result = await service.getCanvaPreview(groupId, leaderId);
 
@@ -1066,16 +1199,29 @@ describe('GroupsService', () => {
         canva_token_expires_at: expiredAt,
       });
       canvaService.createPresentation = vi.fn();
-      (canvaService as unknown as Record<string, ReturnType<typeof vi.fn>>)['refreshAccessToken'] = vi.fn().mockResolvedValue({
-        access_token: 'new-at', refresh_token: 'new-rt', expires_in: 3600,
+      (canvaService as unknown as Record<string, ReturnType<typeof vi.fn>>)[
+        'refreshAccessToken'
+      ] = vi.fn().mockResolvedValue({
+        access_token: 'new-at',
+        refresh_token: 'new-rt',
+        expires_in: 3600,
       });
-      (canvaService as unknown as Record<string, ReturnType<typeof vi.fn>>)['getDesign'] = vi.fn().mockResolvedValue({ editUrl: null });
-      (canvaService as unknown as Record<string, ReturnType<typeof vi.fn>>)['getDesignPages'] = vi.fn().mockResolvedValue([]);
-      (usersService as unknown as { update: ReturnType<typeof vi.fn> }).update = vi.fn().mockResolvedValue({});
+      (canvaService as unknown as Record<string, ReturnType<typeof vi.fn>>)[
+        'getDesign'
+      ] = vi.fn().mockResolvedValue({ editUrl: null });
+      (canvaService as unknown as Record<string, ReturnType<typeof vi.fn>>)[
+        'getDesignPages'
+      ] = vi.fn().mockResolvedValue([]);
+      (usersService as unknown as { update: ReturnType<typeof vi.fn> }).update =
+        vi.fn().mockResolvedValue({});
 
       await service.getCanvaPreview(groupId, leaderId);
 
-      expect((canvaService as unknown as Record<string, ReturnType<typeof vi.fn>>)['refreshAccessToken']).toHaveBeenCalledWith('refresh-token');
+      expect(
+        (canvaService as unknown as Record<string, ReturnType<typeof vi.fn>>)[
+          'refreshAccessToken'
+        ],
+      ).toHaveBeenCalledWith('refresh-token');
     });
   });
 
@@ -1092,14 +1238,20 @@ describe('GroupsService', () => {
     it('skips Drive folder when leader not found', async () => {
       usersService.findById.mockResolvedValue(null);
 
-      const result = await service.create(leaderId, { name: 'No Drive Group', tags: [] });
+      const result = await service.create(leaderId, {
+        name: 'No Drive Group',
+        tags: [],
+      });
 
       expect(googleDriveService.createFolder).not.toHaveBeenCalled();
       expect(result.id).toBe(groupId);
     });
 
     it('skips Drive folder when leader has no Google access token', async () => {
-      usersService.findById.mockResolvedValue({ id: leaderId, email: 'l@t.com' });
+      usersService.findById.mockResolvedValue({
+        id: leaderId,
+        email: 'l@t.com',
+      });
       googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(null);
 
       await service.create(leaderId, { name: 'No Token Group', tags: [] });
@@ -1110,7 +1262,10 @@ describe('GroupsService', () => {
     it('skips saving folder id when Drive folder creation returns no id', async () => {
       googleDriveService.createFolder.mockResolvedValueOnce(null);
 
-      const result = await service.create(leaderId, { name: 'No Folder Id', tags: [] });
+      const result = await service.create(leaderId, {
+        name: 'No Folder Id',
+        tags: [],
+      });
 
       expect(result.id).toBe(groupId);
       // folder id would not be saved
@@ -1118,8 +1273,11 @@ describe('GroupsService', () => {
 
     it('skips Canva when leader has no canva_access_token', async () => {
       usersService.findById.mockResolvedValue({
-        id: leaderId, email: 'l@t.com',
-        google_access_token: 'g-token', notification_enabled: true, full_name: 'Leader',
+        id: leaderId,
+        email: 'l@t.com',
+        google_access_token: 'g-token',
+        notification_enabled: true,
+        full_name: 'Leader',
         canva_access_token: null,
       });
 
@@ -1135,7 +1293,10 @@ describe('GroupsService', () => {
       });
       canvaService.createPresentation.mockResolvedValue(null);
 
-      const result = await service.create(leaderId, { name: 'No Canva Result', tags: [] });
+      const result = await service.create(leaderId, {
+        name: 'No Canva Result',
+        tags: [],
+      });
 
       expect(result.id).toBe(groupId);
     });
@@ -1177,18 +1338,34 @@ describe('GroupsService', () => {
     const memberId = 'mmmm-mmmm-mmmm-mmmm-mmmmmmmmmmmm';
 
     it('toggles is_active for a non-leader member', async () => {
-      groupsRepository.findOne.mockResolvedValue({ id: groupId, leader_id: leaderId, name: 'G' } as Group);
-      membersRepository.findOne.mockResolvedValue({ user_id: memberId, is_active: true } as GroupMember);
-      membersRepository.save.mockImplementation((m: GroupMember) => Promise.resolve({ ...m, is_active: false }));
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+      } as Group);
+      membersRepository.findOne.mockResolvedValue({
+        user_id: memberId,
+        is_active: true,
+      } as GroupMember);
+      membersRepository.save.mockImplementation((m: GroupMember) =>
+        Promise.resolve({ ...m, is_active: false }),
+      );
 
-      const result = await service.toggleMemberStatus(groupId, leaderId, memberId);
+      const result = await service.toggleMemberStatus(
+        groupId,
+        leaderId,
+        memberId,
+      );
 
       expect(membersRepository.save).toHaveBeenCalled();
       expect(result).toMatchObject({ is_active: false });
     });
 
     it('throws NotFoundException when member does not exist', async () => {
-      groupsRepository.findOne.mockResolvedValue({ id: groupId, leader_id: leaderId } as Group);
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        leader_id: leaderId,
+      } as Group);
       membersRepository.findOne.mockResolvedValue(null);
 
       await expect(
@@ -1204,7 +1381,10 @@ describe('GroupsService', () => {
     const memberId = 'nnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn';
 
     it('throws NotFoundException when member record does not exist', async () => {
-      groupsRepository.findOne.mockResolvedValue({ id: groupId, leader_id: leaderId } as Group);
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        leader_id: leaderId,
+      } as Group);
       membersRepository.findOne.mockResolvedValue(null);
 
       await expect(
@@ -1216,44 +1396,79 @@ describe('GroupsService', () => {
   describe('listGroupCalendarEvents', () => {
     it('throws BadRequestException when group has no calendar configured', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', google_calendar_id: null,
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        google_calendar_id: null,
       } as Group);
 
       await expect(
-        service.listGroupCalendarEvents(groupId, leaderId, '2026-06-01', '2026-06-30'),
+        service.listGroupCalendarEvents(
+          groupId,
+          leaderId,
+          '2026-06-01',
+          '2026-06-30',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException when time range is invalid', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', google_calendar_id: 'cal@g.com',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        google_calendar_id: 'cal@g.com',
       } as Group);
       membersRepository.findOne.mockResolvedValue({ user_id: leaderId });
 
       await expect(
-        service.listGroupCalendarEvents(groupId, leaderId, 'invalid', '2026-06-30'),
+        service.listGroupCalendarEvents(
+          groupId,
+          leaderId,
+          'invalid',
+          '2026-06-30',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException when time_max <= time_min', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', google_calendar_id: 'cal@g.com',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        google_calendar_id: 'cal@g.com',
       } as Group);
 
       await expect(
-        service.listGroupCalendarEvents(groupId, leaderId, '2026-06-30', '2026-06-01'),
+        service.listGroupCalendarEvents(
+          groupId,
+          leaderId,
+          '2026-06-30',
+          '2026-06-01',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('throws ForbiddenException when leader has no Google access token', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: leaderId, name: 'G', google_calendar_id: 'cal@g.com',
+        id: groupId,
+        leader_id: leaderId,
+        name: 'G',
+        google_calendar_id: 'cal@g.com',
       } as Group);
-      usersService.findById.mockResolvedValue({ id: leaderId, google_access_token: null });
+      usersService.findById.mockResolvedValue({
+        id: leaderId,
+        google_access_token: null,
+      });
       googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(null);
 
       await expect(
-        service.listGroupCalendarEvents(groupId, leaderId, '2026-06-01', '2026-06-30'),
+        service.listGroupCalendarEvents(
+          groupId,
+          leaderId,
+          '2026-06-01',
+          '2026-06-30',
+        ),
       ).rejects.toThrow(ForbiddenException);
     });
   });

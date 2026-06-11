@@ -27,6 +27,8 @@ import {
   CreateGroupCalendarEventDto,
   CreateMeetEventDto,
   ListGroupCalendarEventsQueryDto,
+  LockGroupDto,
+  UnlockGroupDto,
   UpdateGroupDto,
   InviteMemberDto,
 } from './dto/group.dto';
@@ -55,7 +57,10 @@ export class GroupsController {
   @ApiResponse({ status: 400, description: 'Invalid input' })
   async create(@Req() req: Request, @Body() createGroupDto: CreateGroupDto) {
     const user = req.user as JwtRequestUser;
-    const { group, failedInvitations } = await this.groupsService.create(user.id, createGroupDto);
+    const { group, failedInvitations } = await this.groupsService.create(
+      user.id,
+      createGroupDto,
+    );
     return { ...group, failed_invitations: failedInvitations };
   }
 
@@ -205,6 +210,38 @@ export class GroupsController {
       user.id,
       createMeetEventDto,
     );
+  }
+
+  @Post(':id/lock')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Lock group (leader only, after report date)' })
+  @ApiResponse({ status: 200, description: 'Group locked' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  lockGroup(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() _dto: LockGroupDto,
+  ) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.lockGroup(id, user.id);
+  }
+
+  @Post(':id/unlock')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Unlock group (leader only, reason required)' })
+  @ApiResponse({ status: 200, description: 'Group unlocked' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  unlockGroup(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() dto: UnlockGroupDto,
+  ) {
+    const user = req.user as JwtRequestUser;
+    return this.groupsService.unlockGroup(id, user.id, dto.reason);
   }
 
   @Post(':id/members/invite')

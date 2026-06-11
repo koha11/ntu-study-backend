@@ -13,7 +13,11 @@ import { Group } from '@modules/groups/entities/group.entity';
 import { GroupMember } from '@modules/groups/entities/group-member.entity';
 import { Task } from '@modules/tasks/entities/task.entity';
 import { User } from '@modules/users/entities/user.entity';
-import { Language, NotificationDeliveryChannel, TaskStatus } from '@common/enums';
+import {
+  Language,
+  NotificationDeliveryChannel,
+  TaskStatus,
+} from '@common/enums';
 import { EmailService } from '@common/services/email.service';
 import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 import { NotificationsService } from '@modules/notifications/notifications.service';
@@ -237,7 +241,9 @@ export class ContributionsService {
     }
 
     await this.ratingsRepository.save(rows);
-    this.logger.log(`Evaluation round opened for group ${groupId}: ${rows.length} ratings created`);
+    this.logger.log(
+      `Evaluation round opened for group ${groupId}: ${rows.length} ratings created`,
+    );
 
     await this.notifyMembersEvaluationOpened(
       groupId,
@@ -315,7 +321,9 @@ export class ContributionsService {
       activeUserIds,
     );
 
-    this.logger.log(`Evaluation round closed for group ${groupId}: ${result.affected} ratings updated`);
+    this.logger.log(
+      `Evaluation round closed for group ${groupId}: ${result.affected} ratings updated`,
+    );
     return { updated: result.affected };
   }
 
@@ -525,7 +533,9 @@ export class ContributionsService {
 
     row.score = score;
     await this.ratingsRepository.save(row);
-    this.logger.log(`Rating submitted for task ${taskId} in group ${groupId} by rater ${raterId}: score ${score}`);
+    this.logger.log(
+      `Rating submitted for task ${taskId} in group ${groupId} by rater ${raterId}: score ${score}`,
+    );
     return { ok: true };
   }
 

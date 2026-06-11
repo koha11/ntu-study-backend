@@ -26,7 +26,9 @@ export class GroupEmailThreadService {
     userId: string,
     messageId: string,
   ): Promise<GroupEmailThread> {
-    this.logger.log(`Creating email thread for group ${groupId} user ${userId}`);
+    this.logger.log(
+      `Creating email thread for group ${groupId} user ${userId}`,
+    );
     const thread = this.threadsRepository.create({
       group_id: groupId,
       user_id: userId,

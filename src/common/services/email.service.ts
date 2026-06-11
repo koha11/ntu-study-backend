@@ -434,23 +434,29 @@ export class EmailService {
     threadMessageId?: string;
     lang?: Language;
   }): Promise<string | null> {
-    const { toEmail, groupName, taskScores, overallAverage, groupUrl, threadMessageId, lang } = params;
+    const {
+      toEmail,
+      groupName,
+      taskScores,
+      overallAverage,
+      groupUrl,
+      threadMessageId,
+      lang,
+    } = params;
     const vi = lang !== Language.EN;
     const scoreLabel = overallAverage !== null ? `${overallAverage}/10` : '—';
     const taskRowsHtml = taskScores
-      .map(
-        (t) =>
-          vi
-            ? `<tr><td>${t.taskTitle}</td><td>${t.averageScore !== null ? `${t.averageScore}/10` : '—'}</td></tr>`
-            : `<tr><td>${t.taskTitle}</td><td>${t.averageScore !== null ? `${t.averageScore}/10` : '—'}</td></tr>`,
+      .map((t) =>
+        vi
+          ? `<tr><td>${t.taskTitle}</td><td>${t.averageScore !== null ? `${t.averageScore}/10` : '—'}</td></tr>`
+          : `<tr><td>${t.taskTitle}</td><td>${t.averageScore !== null ? `${t.averageScore}/10` : '—'}</td></tr>`,
       )
       .join('');
     const taskRowsText = taskScores
-      .map(
-        (t) =>
-          vi
-            ? `- ${t.taskTitle}: ${t.averageScore !== null ? `${t.averageScore}/10` : '—'}`
-            : `- ${t.taskTitle}: ${t.averageScore !== null ? `${t.averageScore}/10` : '—'}`,
+      .map((t) =>
+        vi
+          ? `- ${t.taskTitle}: ${t.averageScore !== null ? `${t.averageScore}/10` : '—'}`
+          : `- ${t.taskTitle}: ${t.averageScore !== null ? `${t.averageScore}/10` : '—'}`,
       )
       .join('\n');
     return this.send({
@@ -488,6 +494,83 @@ export class EmailService {
     });
   }
 
+  async sendGroupLockedEmail(params: {
+    toEmails: string[];
+    groupName: string;
+    leaderName: string;
+    groupUrl: string;
+    lang?: Language;
+  }): Promise<void> {
+    const { toEmails, groupName, leaderName, groupUrl, lang } = params;
+    const vi = lang !== Language.EN;
+    await Promise.all(
+      toEmails.map((email) =>
+        this.send({
+          to: email,
+          subject: vi
+            ? `Nhóm "${groupName}" đã bị khóa`
+            : `Group "${groupName}" has been locked`,
+          html: vi
+            ? `
+            <h2>Nhóm đã bị khóa</h2>
+            <p>Trưởng nhóm <strong>${leaderName}</strong> đã khóa nhóm <strong>${groupName}</strong>.</p>
+            <p>Nhóm hiện ở chế độ chỉ đọc. Không thể tạo mới hoặc chỉnh sửa nhiệm vụ, thành viên, lịch và thông tin nhóm cho đến khi nhóm được mở khóa.</p>
+            <p><a href="${groupUrl}">Xem nhóm</a></p>
+          `
+            : `
+            <h2>Group Locked</h2>
+            <p>Group leader <strong>${leaderName}</strong> has locked the group <strong>${groupName}</strong>.</p>
+            <p>The group is now read-only. Tasks, members, calendar events, and group details cannot be created or edited until the group is unlocked.</p>
+            <p><a href="${groupUrl}">View group</a></p>
+          `,
+          text: vi
+            ? `Nhóm "${groupName}" đã bị khóa bởi ${leaderName}. Nhóm hiện ở chế độ chỉ đọc.\n${groupUrl}`
+            : `Group "${groupName}" has been locked by ${leaderName}. The group is now read-only.\n${groupUrl}`,
+        }),
+      ),
+    );
+  }
+
+  async sendGroupUnlockedEmail(params: {
+    toEmails: string[];
+    groupName: string;
+    leaderName: string;
+    reason: string;
+    groupUrl: string;
+    lang?: Language;
+  }): Promise<void> {
+    const { toEmails, groupName, leaderName, reason, groupUrl, lang } = params;
+    const vi = lang !== Language.EN;
+    await Promise.all(
+      toEmails.map((email) =>
+        this.send({
+          to: email,
+          subject: vi
+            ? `Nhóm "${groupName}" đã được mở khóa`
+            : `Group "${groupName}" has been unlocked`,
+          html: vi
+            ? `
+            <h2>Nhóm đã được mở khóa</h2>
+            <p>Trưởng nhóm <strong>${leaderName}</strong> đã mở khóa nhóm <strong>${groupName}</strong>.</p>
+            <p><strong>Lý do:</strong> ${reason}</p>
+            <p>Nhóm đã hoạt động trở lại bình thường.</p>
+            <p><a href="${groupUrl}">Xem nhóm</a></p>
+          `
+            : `
+            <h2>Group Unlocked</h2>
+            <p>Group leader <strong>${leaderName}</strong> has unlocked the group <strong>${groupName}</strong>.</p>
+            <p><strong>Reason:</strong> ${reason}</p>
+            <p>The group is now active again.</p>
+            <p><a href="${groupUrl}">View group</a></p>
+          `,
+          text: vi
+            ? `Nhóm "${groupName}" đã được mở khóa bởi ${leaderName}.\nLý do: ${reason}\n${groupUrl}`
+            : `Group "${groupName}" has been unlocked by ${leaderName}.\nReason: ${reason}\n${groupUrl}`,
+        }),
+      ),
+    );
+  }
+
   /**
    * Sends a single batched reminder listing all overdue tasks for one group.
    * Replaces the old per-task sendTaskReminder for group tasks.
@@ -504,11 +587,10 @@ export class EmailService {
       params;
     const vi = lang !== Language.EN;
     const taskRows = tasks
-      .map(
-        (t) =>
-          vi
-            ? `<li><strong>${t.title}</strong> — hạn ${t.dueDate.toLocaleString()}</li>`
-            : `<li><strong>${t.title}</strong> — due ${t.dueDate.toLocaleString()}</li>`,
+      .map((t) =>
+        vi
+          ? `<li><strong>${t.title}</strong> — hạn ${t.dueDate.toLocaleString()}</li>`
+          : `<li><strong>${t.title}</strong> — due ${t.dueDate.toLocaleString()}</li>`,
       )
       .join('');
     return this.send({

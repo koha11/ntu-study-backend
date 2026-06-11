@@ -104,7 +104,9 @@ export class GoogleTokenExchangeService {
           : undefined,
       };
 
-      this.logger.log(`Google OAuth code exchange successful for ${googleProfile.email}`);
+      this.logger.log(
+        `Google OAuth code exchange successful for ${googleProfile.email}`,
+      );
       return googleProfile;
     } catch (error) {
       // Distinguish between client errors and server errors

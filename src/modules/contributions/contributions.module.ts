@@ -13,7 +13,13 @@ import { NotificationsModule } from '@modules/notifications/notifications.module
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ContributionRating, Group, GroupMember, Task, User]),
+    TypeOrmModule.forFeature([
+      ContributionRating,
+      Group,
+      GroupMember,
+      Task,
+      User,
+    ]),
     AuthModule,
     CommonModule,
     NotificationsModule,

@@ -9,7 +9,8 @@ import { UsersService } from '@modules/users/users.service';
 import type { JwtRequestUser } from '@modules/auth/types/jwt-request-user';
 
 const mockRedirect = vi.fn();
-const makeRes = (): Response => ({ redirect: mockRedirect }) as unknown as Response;
+const makeRes = (): Response =>
+  ({ redirect: mockRedirect }) as unknown as Response;
 
 const makeReq = (userId: string): Request =>
   ({ user: { id: userId } as JwtRequestUser }) as unknown as Request;
@@ -44,7 +45,9 @@ describe('CanvaAuthController', () => {
       generateCodeVerifier: vi.fn().mockReturnValue('code-verifier-abc'),
       codeChallengeFromVerifier: vi.fn().mockReturnValue('code-challenge-xyz'),
       generateOAuthState: vi.fn().mockReturnValue('state-123'),
-      buildAuthorizeUrl: vi.fn().mockReturnValue('https://www.canva.com/api/oauth/authorize?...'),
+      buildAuthorizeUrl: vi
+        .fn()
+        .mockReturnValue('https://www.canva.com/api/oauth/authorize?...'),
       exchangeAuthorizationCode: vi.fn().mockResolvedValue({
         access_token: 'access-token',
         refresh_token: 'refresh-token',
@@ -53,13 +56,16 @@ describe('CanvaAuthController', () => {
     };
     sessionStore = {
       setState: vi.fn(),
-      take: vi.fn().mockReturnValue({ userId, codeVerifier: 'code-verifier-abc' }),
+      take: vi
+        .fn()
+        .mockReturnValue({ userId, codeVerifier: 'code-verifier-abc' }),
     };
     usersService = { update: vi.fn().mockResolvedValue({}) };
     configService = {
       get: vi.fn((key: string) => {
         if (key === 'FRONTEND_URL') return frontendUrl;
-        if (key === 'CANVA_REDIRECT_URI') return 'http://localhost:3000/auth/canva/callback';
+        if (key === 'CANVA_REDIRECT_URI')
+          return 'http://localhost:3000/auth/canva/callback';
         return undefined;
       }),
     };
@@ -185,7 +191,8 @@ describe('CanvaAuthController', () => {
 
     it('uses default frontend URL when FRONTEND_URL config is missing', async () => {
       configService.get.mockImplementation((key: string) => {
-        if (key === 'CANVA_REDIRECT_URI') return 'http://localhost:3000/auth/canva/callback';
+        if (key === 'CANVA_REDIRECT_URI')
+          return 'http://localhost:3000/auth/canva/callback';
         return undefined;
       });
       const res = makeRes();

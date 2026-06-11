@@ -275,9 +275,13 @@ describe('AuthController', () => {
       it('delegates to authService.refreshToken and returns tokens', async () => {
         authService.refreshToken.mockResolvedValue(mockLoginResponse);
 
-        const result = await controller.refreshToken({ refresh_token: 'some-refresh-token' } as any);
+        const result = await controller.refreshToken({
+          refresh_token: 'some-refresh-token',
+        } as any);
 
-        expect(authService.refreshToken).toHaveBeenCalledWith('some-refresh-token');
+        expect(authService.refreshToken).toHaveBeenCalledWith(
+          'some-refresh-token',
+        );
         expect(result).toEqual(mockLoginResponse);
       });
     });

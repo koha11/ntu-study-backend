@@ -48,7 +48,9 @@ export class GoogleAccessTokenService {
       this.logger.log(`Refreshed Google access token for user ${user.id}`);
       return refreshed.access_token;
     } catch {
-      this.logger.error(`Failed to refresh Google access token for user ${user.id}`);
+      this.logger.error(
+        `Failed to refresh Google access token for user ${user.id}`,
+      );
       return null;
     }
   }

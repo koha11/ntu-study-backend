@@ -28,7 +28,10 @@ describe('ContributionsService', () => {
     createQueryBuilder: ReturnType<typeof vi.fn>;
   };
   let groupsRepository: { findOne: ReturnType<typeof vi.fn> };
-  let membersRepository: { find: ReturnType<typeof vi.fn>; findOne: ReturnType<typeof vi.fn> };
+  let membersRepository: {
+    find: ReturnType<typeof vi.fn>;
+    findOne: ReturnType<typeof vi.fn>;
+  };
   let tasksRepository: { find: ReturnType<typeof vi.fn> };
   let usersRepository: { find: ReturnType<typeof vi.fn> };
   let emailService: {
@@ -39,19 +42,45 @@ describe('ContributionsService', () => {
   let notificationsService: { createNotification: ReturnType<typeof vi.fn> };
 
   const qbChain = {
-    select: function () { return this; },
-    addSelect: function () { return this; },
-    distinct: function () { return this; },
-    where: function () { return this; },
-    andWhere: function () { return this; },
-    groupBy: function () { return this; },
-    addGroupBy: function () { return this; },
-    orderBy: function () { return this; },
-    innerJoin: function () { return this; },
-    innerJoinAndSelect: function () { return this; },
-    leftJoinAndSelect: function () { return this; },
-    update: function () { return this; },
-    set: function () { return this; },
+    select: function () {
+      return this;
+    },
+    addSelect: function () {
+      return this;
+    },
+    distinct: function () {
+      return this;
+    },
+    where: function () {
+      return this;
+    },
+    andWhere: function () {
+      return this;
+    },
+    groupBy: function () {
+      return this;
+    },
+    addGroupBy: function () {
+      return this;
+    },
+    orderBy: function () {
+      return this;
+    },
+    innerJoin: function () {
+      return this;
+    },
+    innerJoinAndSelect: function () {
+      return this;
+    },
+    leftJoinAndSelect: function () {
+      return this;
+    },
+    update: function () {
+      return this;
+    },
+    set: function () {
+      return this;
+    },
     execute: vi.fn().mockResolvedValue({ affected: 0 }),
     getMany: vi.fn().mockResolvedValue([]),
     getRawMany: vi.fn().mockResolvedValue([]),
@@ -73,23 +102,40 @@ describe('ContributionsService', () => {
     tasksRepository = { find: vi.fn().mockResolvedValue([]) };
     usersRepository = { find: vi.fn().mockResolvedValue([]) };
     emailService = {
-      sendContributionOpenEmail: vi.fn().mockResolvedValue('<contrib@ntu-study.local>'),
-      sendContributionClosedEmail: vi.fn().mockResolvedValue('<closed@ntu-study.local>'),
+      sendContributionOpenEmail: vi
+        .fn()
+        .mockResolvedValue('<contrib@ntu-study.local>'),
+      sendContributionClosedEmail: vi
+        .fn()
+        .mockResolvedValue('<closed@ntu-study.local>'),
     };
-    groupEmailThreadService = { findByGroupAndUser: vi.fn().mockResolvedValue(null) };
-    notificationsService = { createNotification: vi.fn().mockResolvedValue({}) };
+    groupEmailThreadService = {
+      findByGroupAndUser: vi.fn().mockResolvedValue(null),
+    };
+    notificationsService = {
+      createNotification: vi.fn().mockResolvedValue({}),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ContributionsService,
-        { provide: getRepositoryToken(ContributionRating), useValue: ratingsRepository },
+        {
+          provide: getRepositoryToken(ContributionRating),
+          useValue: ratingsRepository,
+        },
         { provide: getRepositoryToken(Group), useValue: groupsRepository },
-        { provide: getRepositoryToken(GroupMember), useValue: membersRepository },
+        {
+          provide: getRepositoryToken(GroupMember),
+          useValue: membersRepository,
+        },
         { provide: getRepositoryToken(Task), useValue: tasksRepository },
         { provide: getRepositoryToken(User), useValue: usersRepository },
         { provide: EmailService, useValue: emailService },
         { provide: GroupEmailThreadService, useValue: groupEmailThreadService },
-        { provide: ConfigService, useValue: { get: vi.fn().mockReturnValue('http://localhost:5173') } },
+        {
+          provide: ConfigService,
+          useValue: { get: vi.fn().mockReturnValue('http://localhost:5173') },
+        },
         { provide: NotificationsService, useValue: notificationsService },
       ],
     }).compile();
@@ -104,7 +150,9 @@ describe('ContributionsService', () => {
   const groupId = 'gggg-gggg-gggg-gggg';
   const leaderId = 'llll-llll-llll-llll';
   const memberId = 'mmmm-mmmm-mmmm-mmmm';
-  const futureDue = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const futureDue = new Date(
+    Date.now() + 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
   describe('openEvaluation — email notifications', () => {
     const activeGroup = { id: groupId, leader_id: leaderId };
@@ -133,14 +181,20 @@ describe('ContributionsService', () => {
         { user_id: leaderId, is_active: true } as GroupMember,
         { user_id: memberId, is_active: true } as GroupMember,
       ]);
-      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true } as GroupMember);
+      membersRepository.findOne.mockResolvedValue({
+        user_id: leaderId,
+        is_active: true,
+      } as GroupMember);
       ratingsRepository.findOne.mockResolvedValue(null);
       ratingsRepository.save.mockResolvedValue([]);
       tasksRepository.find.mockResolvedValue([eligibleTask as Task]);
     });
 
     it('sends a contribution-open email to every active member', async () => {
-      usersRepository.find.mockResolvedValue([leaderUser, memberUser] as User[]);
+      usersRepository.find.mockResolvedValue([
+        leaderUser,
+        memberUser,
+      ] as User[]);
 
       await service.openEvaluation(groupId, leaderId, futureDue);
 
@@ -177,7 +231,10 @@ describe('ContributionsService', () => {
     });
 
     it('creates ratings for tasks not yet in any previous round', async () => {
-      usersRepository.find.mockResolvedValue([leaderUser, memberUser] as User[]);
+      usersRepository.find.mockResolvedValue([
+        leaderUser,
+        memberUser,
+      ] as User[]);
 
       const result = await service.openEvaluation(groupId, leaderId, futureDue);
 
@@ -193,17 +250,26 @@ describe('ContributionsService', () => {
     it('throws when all eligible tasks were already evaluated in a previous round', async () => {
       // Simulate the previous-round query returning the only eligible task
       qbChain.getRawMany.mockResolvedValueOnce([{ taskId: eligibleTask.id }]);
-      usersRepository.find.mockResolvedValue([leaderUser, memberUser] as User[]);
+      usersRepository.find.mockResolvedValue([
+        leaderUser,
+        memberUser,
+      ] as User[]);
 
       await expect(
         service.openEvaluation(groupId, leaderId, futureDue),
-      ).rejects.toThrow('All eligible tasks have already been evaluated in a previous round');
+      ).rejects.toThrow(
+        'All eligible tasks have already been evaluated in a previous round',
+      );
     });
   });
 
   describe('closeEvaluation — notifications', () => {
     const roundStartedAt = new Date('2026-04-01T00:00:00.000Z');
-    const activeGroup = { id: groupId, name: 'Test Group', leader_id: leaderId };
+    const activeGroup = {
+      id: groupId,
+      name: 'Test Group',
+      leader_id: leaderId,
+    };
     const memberUser = {
       id: memberId,
       email: 'member@test.com',
@@ -229,10 +295,16 @@ describe('ContributionsService', () => {
       await service.closeEvaluation(groupId, leaderId, roundStartedAt);
 
       expect(notificationsService.createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({ recipient_id: memberId, type: 'evaluation_closed' }),
+        expect.objectContaining({
+          recipient_id: memberId,
+          type: 'evaluation_closed',
+        }),
       );
       expect(emailService.sendContributionClosedEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ toEmail: 'member@test.com', overallAverage: 8.5 }),
+        expect.objectContaining({
+          toEmail: 'member@test.com',
+          overallAverage: 8.5,
+        }),
       );
     });
 
@@ -293,7 +365,11 @@ describe('ContributionsService', () => {
       qbChain.execute.mockResolvedValueOnce({ affected: 0 });
 
       await expect(
-        service.closeEvaluation(groupId, leaderId, new Date('2026-04-01T00:00:00.000Z')),
+        service.closeEvaluation(
+          groupId,
+          leaderId,
+          new Date('2026-04-01T00:00:00.000Z'),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -304,7 +380,10 @@ describe('ContributionsService', () => {
 
     beforeEach(() => {
       groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
-      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true } as GroupMember);
+      membersRepository.findOne.mockResolvedValue({
+        user_id: leaderId,
+        is_active: true,
+      } as GroupMember);
     });
 
     it('returns mapped rounds from raw query', async () => {
@@ -349,18 +428,29 @@ describe('ContributionsService', () => {
 
     beforeEach(() => {
       groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
-      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true } as GroupMember);
+      membersRepository.findOne.mockResolvedValue({
+        user_id: leaderId,
+        is_active: true,
+      } as GroupMember);
     });
 
     it('returns rating rows when round exists', async () => {
       qbChain.getMany.mockResolvedValueOnce([
         {
           score: null,
-          task: { id: 'task-1', title: 'Do thing', assignee: { full_name: 'Alice' } },
+          task: {
+            id: 'task-1',
+            title: 'Do thing',
+            assignee: { full_name: 'Alice' },
+          },
         },
       ]);
 
-      const result = await service.getMyRatingsForRound(groupId, roundStartedAt, leaderId);
+      const result = await service.getMyRatingsForRound(
+        groupId,
+        roundStartedAt,
+        leaderId,
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].task_title).toBe('Do thing');
@@ -383,7 +473,10 @@ describe('ContributionsService', () => {
 
     beforeEach(() => {
       groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
-      membersRepository.findOne.mockResolvedValue({ user_id: memberId, is_active: true } as GroupMember);
+      membersRepository.findOne.mockResolvedValue({
+        user_id: memberId,
+        is_active: true,
+      } as GroupMember);
     });
 
     it('saves the score and returns ok:true', async () => {
@@ -396,7 +489,13 @@ describe('ContributionsService', () => {
       });
       ratingsRepository.save.mockResolvedValue({});
 
-      const result = await service.submitRating(groupId, roundStartedAt, memberId, taskId, 8);
+      const result = await service.submitRating(
+        groupId,
+        roundStartedAt,
+        memberId,
+        taskId,
+        8,
+      );
 
       expect(ratingsRepository.save).toHaveBeenCalled();
       expect(result).toEqual({ ok: true });
@@ -443,16 +542,27 @@ describe('ContributionsService', () => {
 
     beforeEach(() => {
       groupsRepository.findOne.mockResolvedValue(activeGroup as Group);
-      membersRepository.findOne.mockResolvedValue({ user_id: leaderId, is_active: true } as GroupMember);
+      membersRepository.findOne.mockResolvedValue({
+        user_id: leaderId,
+        is_active: true,
+      } as GroupMember);
     });
 
     it('returns aggregated results when round is closed', async () => {
       ratingsRepository.findOne.mockResolvedValue({ is_round_closed: true });
       qbChain.getRawMany.mockResolvedValueOnce([
-        { assignee_id: memberId, assignee_full_name: 'Member', average_score: '8.50' },
+        {
+          assignee_id: memberId,
+          assignee_full_name: 'Member',
+          average_score: '8.50',
+        },
       ]);
 
-      const result = await service.getAggregatedResults(groupId, roundStartedAt, leaderId);
+      const result = await service.getAggregatedResults(
+        groupId,
+        roundStartedAt,
+        leaderId,
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].average_score).toBe(8.5);

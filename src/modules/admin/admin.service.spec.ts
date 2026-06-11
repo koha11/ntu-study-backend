@@ -183,13 +183,17 @@ describe('AdminService', () => {
 
   it('lockUser throws NotFoundException when user not found', async () => {
     usersRepo.findOne.mockResolvedValue(null);
-    await expect(service.lockUser('missing')).rejects.toThrow(NotFoundException);
+    await expect(service.lockUser('missing')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('unlockUser sets is_active to true', async () => {
     const inactiveUser = { ...user, is_active: false };
     usersRepo.findOne.mockResolvedValue(inactiveUser);
-    usersRepo.save.mockImplementation((u: typeof user) => Promise.resolve({ ...u, is_active: true }));
+    usersRepo.save.mockImplementation((u: typeof user) =>
+      Promise.resolve({ ...u, is_active: true }),
+    );
 
     const out = await service.unlockUser('u1');
 
@@ -199,7 +203,9 @@ describe('AdminService', () => {
 
   it('unlockUser throws NotFoundException when user not found', async () => {
     usersRepo.findOne.mockResolvedValue(null);
-    await expect(service.unlockUser('missing')).rejects.toThrow(NotFoundException);
+    await expect(service.unlockUser('missing')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('findAllUsers applies search filter when query provided', async () => {

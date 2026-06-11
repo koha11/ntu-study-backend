@@ -68,10 +68,7 @@ export class FlashcardsController {
   @Get('groups/:groupId/shared')
   @ApiOperation({ summary: 'List flashcard sets shared with a group' })
   @ApiResponse({ status: 200, description: 'Shared flashcard sets' })
-  getGroupSharedSets(
-    @Req() req: Request,
-    @Param('groupId') groupId: string,
-  ) {
+  getGroupSharedSets(@Req() req: Request, @Param('groupId') groupId: string) {
     const user = req.user as JwtRequestUser;
     return this.flashcardsService.getGroupSharedSets(user.id, groupId);
   }
@@ -188,7 +185,12 @@ export class FlashcardsController {
     const user = req.user as JwtRequestUser;
     return this.flashcardsService
       .shareSetWithGroup(user.id, id, dto.group_id)
-      .then((r) => ({ share_id: r.id, set_id: r.set_id, group_id: r.group_id, shared_at: r.created_at }));
+      .then((r) => ({
+        share_id: r.id,
+        set_id: r.set_id,
+        group_id: r.group_id,
+        shared_at: r.created_at,
+      }));
   }
 
   @Delete(':id/share/:groupId')

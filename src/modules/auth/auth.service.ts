@@ -23,7 +23,11 @@ export class AuthService {
   ) {}
 
   private async getTokens(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role?.role_name };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role?.role_name,
+    };
     const accessExpiry =
       this.configService.get<number>('JWT_EXPIRATION') ?? 3600;
     const accessToken = await this.jwtService.signAsync(payload, {
@@ -110,7 +114,9 @@ export class AuthService {
         });
       }
 
-      this.logger.log(`Google OAuth completed for user ${user.id} (${googleProfile.email})`);
+      this.logger.log(
+        `Google OAuth completed for user ${user.id} (${googleProfile.email})`,
+      );
       return user.id;
     } catch (error) {
       if (error instanceof UnauthorizedException) {

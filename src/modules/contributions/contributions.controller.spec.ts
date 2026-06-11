@@ -47,14 +47,18 @@ describe('ContributionsController', () => {
 
   describe('openEvaluation', () => {
     it('delegates to service.openEvaluation with groupId, userId, and due_date', async () => {
-      const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const result = await controller.openEvaluation(
-        makeReq(userId),
-        groupId,
-        { due_date: dueDate },
-      );
+      const dueDate = new Date(
+        Date.now() + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString();
+      const result = await controller.openEvaluation(makeReq(userId), groupId, {
+        due_date: dueDate,
+      });
 
-      expect(service.openEvaluation).toHaveBeenCalledWith(groupId, userId, dueDate);
+      expect(service.openEvaluation).toHaveBeenCalledWith(
+        groupId,
+        userId,
+        dueDate,
+      );
       expect(result).toEqual({ ratings_created: 3 });
     });
   });
@@ -68,7 +72,11 @@ describe('ContributionsController', () => {
       );
 
       expect(service.parseRoundStartedAt).toHaveBeenCalledWith(roundParam);
-      expect(service.closeEvaluation).toHaveBeenCalledWith(groupId, userId, roundDate);
+      expect(service.closeEvaluation).toHaveBeenCalledWith(
+        groupId,
+        userId,
+        roundDate,
+      );
       expect(result).toEqual({ closed: true });
     });
   });
@@ -86,12 +94,22 @@ describe('ContributionsController', () => {
 
   describe('myRatings', () => {
     it('parses roundStartedAt and returns ratings', async () => {
-      service.getMyRatingsForRound.mockResolvedValue([{ task_id: taskId, score: null }]);
+      service.getMyRatingsForRound.mockResolvedValue([
+        { task_id: taskId, score: null },
+      ]);
 
-      const result = await controller.myRatings(makeReq(userId), groupId, roundParam);
+      const result = await controller.myRatings(
+        makeReq(userId),
+        groupId,
+        roundParam,
+      );
 
       expect(service.parseRoundStartedAt).toHaveBeenCalledWith(roundParam);
-      expect(service.getMyRatingsForRound).toHaveBeenCalledWith(groupId, roundDate, userId);
+      expect(service.getMyRatingsForRound).toHaveBeenCalledWith(
+        groupId,
+        roundDate,
+        userId,
+      );
       expect(result).toHaveLength(1);
     });
   });
@@ -120,12 +138,22 @@ describe('ContributionsController', () => {
 
   describe('results', () => {
     it('parses roundStartedAt and returns aggregated results', async () => {
-      service.getAggregatedResults.mockResolvedValue([{ user_id: userId, average: 7.5 }]);
+      service.getAggregatedResults.mockResolvedValue([
+        { user_id: userId, average: 7.5 },
+      ]);
 
-      const result = await controller.results(makeReq(userId), groupId, roundParam);
+      const result = await controller.results(
+        makeReq(userId),
+        groupId,
+        roundParam,
+      );
 
       expect(service.parseRoundStartedAt).toHaveBeenCalledWith(roundParam);
-      expect(service.getAggregatedResults).toHaveBeenCalledWith(groupId, roundDate, userId);
+      expect(service.getAggregatedResults).toHaveBeenCalledWith(
+        groupId,
+        roundDate,
+        userId,
+      );
       expect(result).toHaveLength(1);
     });
   });

@@ -40,8 +40,12 @@ describe('GoogleDriveService', () => {
     vi.clearAllMocks();
     service = new GoogleDriveService();
     // Override private client factories via casting
-    vi.spyOn(service as any, 'getDriveClient').mockReturnValue(makeDriveClient());
-    vi.spyOn(service as any, 'getDriveActivityClient').mockReturnValue(makeDriveActivityClient());
+    vi.spyOn(service as any, 'getDriveClient').mockReturnValue(
+      makeDriveClient(),
+    );
+    vi.spyOn(service as any, 'getDriveActivityClient').mockReturnValue(
+      makeDriveActivityClient(),
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -50,7 +54,11 @@ describe('GoogleDriveService', () => {
   describe('createFolder', () => {
     it('returns folder data on success', async () => {
       mockFilesCreate.mockResolvedValue({
-        data: { id: 'folder-id', name: 'MyFolder', webViewLink: 'https://drive.google.com/f' },
+        data: {
+          id: 'folder-id',
+          name: 'MyFolder',
+          webViewLink: 'https://drive.google.com/f',
+        },
       });
 
       const result = await service.createFolder(accessToken, 'MyFolder');
@@ -130,7 +138,10 @@ describe('GoogleDriveService', () => {
       });
 
       const result = await service.uploadFile(
-        accessToken, 'file.txt', Buffer.from('content'), 'text/plain',
+        accessToken,
+        'file.txt',
+        Buffer.from('content'),
+        'text/plain',
       );
 
       expect(result.id).toBe('uploaded-id');
@@ -141,7 +152,10 @@ describe('GoogleDriveService', () => {
       const stream = Readable.from(['hello']);
 
       const result = await service.uploadFile(
-        accessToken, 'file.txt', stream, 'text/plain',
+        accessToken,
+        'file.txt',
+        stream,
+        'text/plain',
       );
 
       expect(result.id).toBe('stream-id');
@@ -151,7 +165,10 @@ describe('GoogleDriveService', () => {
       mockFilesCreate.mockRejectedValue(new Error('Upload failed'));
 
       const result = await service.uploadFile(
-        accessToken, 'file.txt', Buffer.from('x'), 'text/plain',
+        accessToken,
+        'file.txt',
+        Buffer.from('x'),
+        'text/plain',
       );
 
       expect(result).toBeNull();
@@ -161,12 +178,18 @@ describe('GoogleDriveService', () => {
       mockFilesCreate.mockResolvedValue({ data: { id: 'p-file' } });
 
       await service.uploadFile(
-        accessToken, 'file.txt', Buffer.from('data'), 'text/plain', 'parent-folder-id',
+        accessToken,
+        'file.txt',
+        Buffer.from('data'),
+        'text/plain',
+        'parent-folder-id',
       );
 
       expect(mockFilesCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          requestBody: expect.objectContaining({ parents: ['parent-folder-id'] }),
+          requestBody: expect.objectContaining({
+            parents: ['parent-folder-id'],
+          }),
         }),
       );
     });
@@ -178,7 +201,12 @@ describe('GoogleDriveService', () => {
   describe('getFileMetadata', () => {
     it('returns metadata on success', async () => {
       mockFilesGetRaw.mockResolvedValue({
-        data: { id: 'file-1', name: 'doc.pdf', mimeType: 'application/pdf', parents: ['folder-1'] },
+        data: {
+          id: 'file-1',
+          name: 'doc.pdf',
+          mimeType: 'application/pdf',
+          parents: ['folder-1'],
+        },
       });
 
       const result = await service.getFileMetadata(accessToken, 'file-1');
@@ -212,7 +240,9 @@ describe('GoogleDriveService', () => {
   describe('isResourceUnderFolder', () => {
     it('returns true immediately when resourceId equals rootFolderId', async () => {
       const result = await service.isResourceUnderFolder(
-        accessToken, 'root-id', 'root-id',
+        accessToken,
+        'root-id',
+        'root-id',
       );
       expect(result).toBe(true);
       expect(mockFilesGetRaw).not.toHaveBeenCalled();
@@ -220,11 +250,18 @@ describe('GoogleDriveService', () => {
 
     it('returns true when file is directly inside root folder', async () => {
       mockFilesGetRaw.mockResolvedValue({
-        data: { id: 'file-1', name: 'f', mimeType: 'text/plain', parents: ['root-id'] },
+        data: {
+          id: 'file-1',
+          name: 'f',
+          mimeType: 'text/plain',
+          parents: ['root-id'],
+        },
       });
 
       const result = await service.isResourceUnderFolder(
-        accessToken, 'root-id', 'file-1',
+        accessToken,
+        'root-id',
+        'file-1',
       );
       expect(result).toBe(true);
     });
@@ -233,13 +270,27 @@ describe('GoogleDriveService', () => {
       // File → Subfolder → Root
       mockFilesGetRaw
         .mockResolvedValueOnce({
-          data: { id: 'file-1', name: 'f', mimeType: 'text/plain', parents: ['subfolder-1'] },
+          data: {
+            id: 'file-1',
+            name: 'f',
+            mimeType: 'text/plain',
+            parents: ['subfolder-1'],
+          },
         })
         .mockResolvedValueOnce({
-          data: { id: 'subfolder-1', name: 'sub', mimeType: 'application/vnd.google-apps.folder', parents: ['root-id'] },
+          data: {
+            id: 'subfolder-1',
+            name: 'sub',
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: ['root-id'],
+          },
         });
 
-      const result = await service.isResourceUnderFolder(accessToken, 'root-id', 'file-1');
+      const result = await service.isResourceUnderFolder(
+        accessToken,
+        'root-id',
+        'file-1',
+      );
       expect(result).toBe(true);
     });
 
@@ -249,7 +300,9 @@ describe('GoogleDriveService', () => {
       });
 
       const result = await service.isResourceUnderFolder(
-        accessToken, 'root-id', 'file-1',
+        accessToken,
+        'root-id',
+        'file-1',
       );
       expect(result).toBe(false);
     });
@@ -258,7 +311,9 @@ describe('GoogleDriveService', () => {
       mockFilesGetRaw.mockRejectedValue(new Error('not found'));
 
       const result = await service.isResourceUnderFolder(
-        accessToken, 'root-id', 'file-1',
+        accessToken,
+        'root-id',
+        'file-1',
       );
       expect(result).toBe(false);
     });
@@ -271,7 +326,10 @@ describe('GoogleDriveService', () => {
     it('calling uploadFile with an unsupported body returns null (TypeError caught internally)', async () => {
       // toUploadReadable throws TypeError internally; uploadFile catches it and returns null
       const result = await service.uploadFile(
-        accessToken, 'file.txt', {} as unknown as Buffer, 'text/plain',
+        accessToken,
+        'file.txt',
+        {} as unknown as Buffer,
+        'text/plain',
       );
       expect(result).toBeNull();
     });
@@ -305,7 +363,12 @@ describe('GoogleDriveService', () => {
     it('calls permissions.create with correct arguments', async () => {
       mockPermissionsCreate.mockResolvedValue({ data: { id: 'perm-id' } });
 
-      const result = await service.shareFile(accessToken, 'file-1', 'user@test.com', 'writer');
+      const result = await service.shareFile(
+        accessToken,
+        'file-1',
+        'user@test.com',
+        'writer',
+      );
 
       expect(mockPermissionsCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -334,7 +397,11 @@ describe('GoogleDriveService', () => {
     it('returns null on API error', async () => {
       mockPermissionsCreate.mockRejectedValue(new Error('Share failed'));
 
-      const result = await service.shareFile(accessToken, 'file-1', 'user@test.com');
+      const result = await service.shareFile(
+        accessToken,
+        'file-1',
+        'user@test.com',
+      );
 
       expect(result).toBeNull();
     });
@@ -346,7 +413,9 @@ describe('GoogleDriveService', () => {
   describe('getAboutStorageQuota', () => {
     it('returns usage sum of usageInDrive and usageInDriveTrash', async () => {
       mockAboutGet.mockResolvedValue({
-        data: { storageQuota: { usageInDrive: '1000', usageInDriveTrash: '200' } },
+        data: {
+          storageQuota: { usageInDrive: '1000', usageInDriveTrash: '200' },
+        },
       });
 
       const result = await service.getAboutStorageQuota(accessToken);
@@ -386,7 +455,11 @@ describe('GoogleDriveService', () => {
   // -------------------------------------------------------------------------
   describe('syncGroupFlashcards', () => {
     it('returns true (stub)', async () => {
-      const result = await service.syncGroupFlashcards(accessToken, 'group-1', 'folder-1');
+      const result = await service.syncGroupFlashcards(
+        accessToken,
+        'group-1',
+        'folder-1',
+      );
       expect(result).toBe(true);
     });
   });
@@ -398,29 +471,48 @@ describe('GoogleDriveService', () => {
     it('returns null when file metadata is not found (API error)', async () => {
       mockFilesGetRaw.mockRejectedValue(new Error('not found'));
 
-      const result = await service.getFileContentStreamForPreview(accessToken, 'bad-id');
+      const result = await service.getFileContentStreamForPreview(
+        accessToken,
+        'bad-id',
+      );
 
       expect(result).toBeNull();
     });
 
     it('returns null for folder mime type', async () => {
       mockFilesGetRaw.mockResolvedValue({
-        data: { id: 'f1', name: 'folder', mimeType: 'application/vnd.google-apps.folder', parents: [] },
+        data: {
+          id: 'f1',
+          name: 'folder',
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: [],
+        },
       });
 
-      const result = await service.getFileContentStreamForPreview(accessToken, 'f1');
+      const result = await service.getFileContentStreamForPreview(
+        accessToken,
+        'f1',
+      );
 
       expect(result).toBeNull();
     });
 
     it('exports Google Docs as PDF stream', async () => {
       mockFilesGetRaw.mockResolvedValue({
-        data: { id: 'doc1', name: 'MyDoc', mimeType: 'application/vnd.google-apps.document', parents: [] },
+        data: {
+          id: 'doc1',
+          name: 'MyDoc',
+          mimeType: 'application/vnd.google-apps.document',
+          parents: [],
+        },
       });
       const fakeStream = Readable.from(['pdf bytes']);
       mockFilesExport.mockResolvedValue({ data: fakeStream });
 
-      const result = await service.getFileContentStreamForPreview(accessToken, 'doc1');
+      const result = await service.getFileContentStreamForPreview(
+        accessToken,
+        'doc1',
+      );
 
       expect(result?.mimeType).toBe('application/pdf');
       expect(result?.filename).toBe('MyDoc.pdf');
@@ -428,12 +520,20 @@ describe('GoogleDriveService', () => {
 
     it('exports Google Slides (presentation) as PDF stream', async () => {
       mockFilesGetRaw.mockResolvedValue({
-        data: { id: 'slide1', name: 'MyPresentation', mimeType: 'application/vnd.google-apps.presentation', parents: [] },
+        data: {
+          id: 'slide1',
+          name: 'MyPresentation',
+          mimeType: 'application/vnd.google-apps.presentation',
+          parents: [],
+        },
       });
       const fakeStream = Readable.from(['slide bytes']);
       mockFilesExport.mockResolvedValue({ data: fakeStream });
 
-      const result = await service.getFileContentStreamForPreview(accessToken, 'slide1');
+      const result = await service.getFileContentStreamForPreview(
+        accessToken,
+        'slide1',
+      );
 
       expect(result?.mimeType).toBe('application/pdf');
       expect(result?.filename).toBe('MyPresentation.pdf');
@@ -441,24 +541,40 @@ describe('GoogleDriveService', () => {
 
     it('exports generic Google Workspace type as PDF', async () => {
       mockFilesGetRaw.mockResolvedValue({
-        data: { id: 'form1', name: 'MyForm', mimeType: 'application/vnd.google-apps.form', parents: [] },
+        data: {
+          id: 'form1',
+          name: 'MyForm',
+          mimeType: 'application/vnd.google-apps.form',
+          parents: [],
+        },
       });
       const fakeStream = Readable.from(['form bytes']);
       mockFilesExport.mockResolvedValue({ data: fakeStream });
 
-      const result = await service.getFileContentStreamForPreview(accessToken, 'form1');
+      const result = await service.getFileContentStreamForPreview(
+        accessToken,
+        'form1',
+      );
 
       expect(result?.mimeType).toBe('application/pdf');
     });
 
     it('exports Google Sheets as xlsx', async () => {
       mockFilesGetRaw.mockResolvedValue({
-        data: { id: 'sheet1', name: 'Sheet', mimeType: 'application/vnd.google-apps.spreadsheet', parents: [] },
+        data: {
+          id: 'sheet1',
+          name: 'Sheet',
+          mimeType: 'application/vnd.google-apps.spreadsheet',
+          parents: [],
+        },
       });
       const fakeStream = Readable.from(['xlsx bytes']);
       mockFilesExport.mockResolvedValue({ data: fakeStream });
 
-      const result = await service.getFileContentStreamForPreview(accessToken, 'sheet1');
+      const result = await service.getFileContentStreamForPreview(
+        accessToken,
+        'sheet1',
+      );
 
       expect(result?.filename).toBe('Sheet.xlsx');
     });
@@ -467,12 +583,20 @@ describe('GoogleDriveService', () => {
       // First call: getFileMetadata (uses mockFilesGetRaw)
       mockFilesGetRaw
         .mockResolvedValueOnce({
-          data: { id: 'img1', name: 'photo.png', mimeType: 'image/png', parents: [] },
+          data: {
+            id: 'img1',
+            name: 'photo.png',
+            mimeType: 'image/png',
+            parents: [],
+          },
         })
         // Second call: files.get({ alt: 'media' })
         .mockResolvedValueOnce({ data: Readable.from(['img bytes']) });
 
-      const result = await service.getFileContentStreamForPreview(accessToken, 'img1');
+      const result = await service.getFileContentStreamForPreview(
+        accessToken,
+        'img1',
+      );
 
       expect(result?.mimeType).toBe('image/png');
       expect(result?.filename).toBe('photo.png');
@@ -480,7 +604,12 @@ describe('GoogleDriveService', () => {
 
     it('returns null when the export/stream API call throws', async () => {
       mockFilesGetRaw.mockResolvedValue({
-        data: { id: 'f1', name: 'file.pdf', mimeType: 'application/pdf', parents: [] },
+        data: {
+          id: 'f1',
+          name: 'file.pdf',
+          mimeType: 'application/pdf',
+          parents: [],
+        },
       });
       mockFilesGetRaw.mockRejectedValueOnce(new Error('stream error'));
 
@@ -491,15 +620,24 @@ describe('GoogleDriveService', () => {
         ...makeDriveClient(),
         files: {
           ...makeDriveClient().files,
-          get: vi.fn()
+          get: vi
+            .fn()
             .mockResolvedValueOnce({
-              data: { id: 'f1', name: 'file.pdf', mimeType: 'application/pdf', parents: [] },
+              data: {
+                id: 'f1',
+                name: 'file.pdf',
+                mimeType: 'application/pdf',
+                parents: [],
+              },
             })
             .mockRejectedValueOnce(new Error('stream error')),
         },
       });
 
-      const result = await service.getFileContentStreamForPreview(accessToken, 'f1');
+      const result = await service.getFileContentStreamForPreview(
+        accessToken,
+        'f1',
+      );
 
       expect(result).toBeNull();
     });
@@ -526,11 +664,17 @@ describe('GoogleDriveService', () => {
     });
 
     it('passes pageToken when provided', async () => {
-      mockActivityQuery.mockResolvedValue({ data: { nextPageToken: 'next-token-123' } });
-
-      const result = await service.queryFolderActivity(accessToken, 'folder-1', {
-        pageToken: 'prev-token',
+      mockActivityQuery.mockResolvedValue({
+        data: { nextPageToken: 'next-token-123' },
       });
+
+      const result = await service.queryFolderActivity(
+        accessToken,
+        'folder-1',
+        {
+          pageToken: 'prev-token',
+        },
+      );
 
       expect(mockActivityQuery).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -543,7 +687,9 @@ describe('GoogleDriveService', () => {
     it('clamps pageSize to 50 when above max', async () => {
       mockActivityQuery.mockResolvedValue({ data: {} });
 
-      await service.queryFolderActivity(accessToken, 'folder-1', { pageSize: 100 });
+      await service.queryFolderActivity(accessToken, 'folder-1', {
+        pageSize: 100,
+      });
 
       expect(mockActivityQuery).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -555,7 +701,9 @@ describe('GoogleDriveService', () => {
     it('clamps pageSize to 1 when below min', async () => {
       mockActivityQuery.mockResolvedValue({ data: {} });
 
-      await service.queryFolderActivity(accessToken, 'folder-1', { pageSize: 0 });
+      await service.queryFolderActivity(accessToken, 'folder-1', {
+        pageSize: 0,
+      });
 
       expect(mockActivityQuery).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -582,7 +730,9 @@ describe('GoogleDriveService', () => {
             {
               primaryActionDetail: { create: {} },
               actors: [{ user: { knownUser: { personName: 'people/user1' } } }],
-              targets: [{ driveItem: { name: 'items/file1', title: 'doc.pdf' } }],
+              targets: [
+                { driveItem: { name: 'items/file1', title: 'doc.pdf' } },
+              ],
               timestamp: '2026-01-01T00:00:00Z',
             },
           ],
@@ -597,7 +747,9 @@ describe('GoogleDriveService', () => {
 
     it('handles People API failure gracefully (null actor profile)', async () => {
       vi.spyOn(service as any, 'getPeopleClient').mockReturnValue({
-        people: { get: vi.fn().mockRejectedValue(new Error('People API error')) },
+        people: {
+          get: vi.fn().mockRejectedValue(new Error('People API error')),
+        },
       });
 
       mockActivityQuery.mockResolvedValue({

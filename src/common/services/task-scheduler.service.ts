@@ -111,11 +111,15 @@ export class TaskSchedulerService {
       byGroup.get(gkey)!.push(task);
     }
 
-    const base =
-      (process.env.FRONTEND_URL ?? 'http://localhost:5173').replace(/\/$/, '');
+    const base = (process.env.FRONTEND_URL ?? 'http://localhost:5173').replace(
+      /\/$/,
+      '',
+    );
 
     for (const [userId, byGroup] of byUserAndGroup.entries()) {
-      const user = await this.usersRepository.findOne({ where: { id: userId } });
+      const user = await this.usersRepository.findOne({
+        where: { id: userId },
+      });
       if (!user) continue;
 
       for (const [groupKey, tasks] of byGroup.entries()) {

@@ -99,7 +99,11 @@ describe('EmailService', () => {
     it('returns the messageId string on success', async () => {
       mockSendMail.mockResolvedValue({ messageId: '<msg-1@ntu-study.local>' });
 
-      const result = await service.send({ to: 'a@b.com', subject: 'Hi', text: 'Hello' });
+      const result = await service.send({
+        to: 'a@b.com',
+        subject: 'Hi',
+        text: 'Hello',
+      });
 
       expect(result).toBe('<msg-1@ntu-study.local>');
     });
@@ -107,7 +111,11 @@ describe('EmailService', () => {
     it('returns null on transport failure', async () => {
       mockSendMail.mockRejectedValue(new Error('SMTP error'));
 
-      const result = await service.send({ to: 'a@b.com', subject: 'Hi', text: 'Hello' });
+      const result = await service.send({
+        to: 'a@b.com',
+        subject: 'Hi',
+        text: 'Hello',
+      });
 
       expect(result).toBeNull();
     });
@@ -116,7 +124,12 @@ describe('EmailService', () => {
       mockSendMail.mockResolvedValue({ messageId: '<msg-2@ntu-study.local>' });
       const threadRoot = '<root@ntu-study.local>';
 
-      await service.send({ to: 'a@b.com', subject: 'Re: Hi', text: 'Hello', inReplyTo: threadRoot });
+      await service.send({
+        to: 'a@b.com',
+        subject: 'Re: Hi',
+        text: 'Hello',
+        inReplyTo: threadRoot,
+      });
 
       const callArg = mockSendMail.mock.calls[0][0];
       expect(callArg.inReplyTo).toBe(threadRoot);
@@ -136,7 +149,9 @@ describe('EmailService', () => {
 
   describe('sendGroupCreatedEmail()', () => {
     it('sends an email with group creation content and returns messageId', async () => {
-      mockSendMail.mockResolvedValue({ messageId: '<created@ntu-study.local>' });
+      mockSendMail.mockResolvedValue({
+        messageId: '<created@ntu-study.local>',
+      });
 
       const result = await service.sendGroupCreatedEmail({
         toEmail: 'leader@test.com',
@@ -201,7 +216,9 @@ describe('EmailService', () => {
 
   describe('sendContributionOpenEmail()', () => {
     it('sends an email with peer-review content and returns messageId', async () => {
-      mockSendMail.mockResolvedValue({ messageId: '<contrib@ntu-study.local>' });
+      mockSendMail.mockResolvedValue({
+        messageId: '<contrib@ntu-study.local>',
+      });
       const due = new Date('2026-06-01T00:00:00Z');
 
       const result = await service.sendContributionOpenEmail({
@@ -364,7 +381,9 @@ describe('EmailService', () => {
     });
 
     it('sends Vietnamese failed+comment content', async () => {
-      mockSendMail.mockResolvedValue({ messageId: '<vi-fail@ntu-study.local>' });
+      mockSendMail.mockResolvedValue({
+        messageId: '<vi-fail@ntu-study.local>',
+      });
 
       await service.sendTaskReviewResultEmail({
         toEmail: 'dev@test.com',
@@ -404,8 +423,12 @@ describe('EmailService', () => {
 
     it('sendGroupInvitation uses English subject', async () => {
       await service.sendGroupInvitation(
-        'invitee@test.com', 'Bob', 'Squad',
-        'http://link', undefined, Language.EN,
+        'invitee@test.com',
+        'Bob',
+        'Squad',
+        'http://link',
+        undefined,
+        Language.EN,
       );
       const arg = mockSendMail.mock.calls[0][0];
       expect(arg.subject).toContain("You're invited");
@@ -486,7 +509,9 @@ describe('EmailService', () => {
     });
 
     it('sends Vietnamese content when lang is VI', async () => {
-      mockSendMail.mockResolvedValue({ messageId: '<vi-closed@ntu-study.local>' });
+      mockSendMail.mockResolvedValue({
+        messageId: '<vi-closed@ntu-study.local>',
+      });
 
       await service.sendContributionClosedEmail({
         toEmail: 'member@test.com',
@@ -502,7 +527,9 @@ describe('EmailService', () => {
     });
 
     it('shows em-dash when overallAverage is null', async () => {
-      mockSendMail.mockResolvedValue({ messageId: '<null-avg@ntu-study.local>' });
+      mockSendMail.mockResolvedValue({
+        messageId: '<null-avg@ntu-study.local>',
+      });
 
       await service.sendContributionClosedEmail({
         toEmail: 'member@test.com',
@@ -539,7 +566,9 @@ describe('EmailService', () => {
       mockSendMail.mockResolvedValue({ messageId: '<notif@ntu-study.local>' });
 
       const result = await service.sendNotification(
-        'user@test.com', 'Alert', 'Something happened',
+        'user@test.com',
+        'Alert',
+        'Something happened',
       );
 
       expect(result).toBe('<notif@ntu-study.local>');
@@ -648,7 +677,10 @@ describe('EmailService', () => {
 
     it('handles x-message-id as array', async () => {
       mockSgSend.mockResolvedValue([
-        { statusCode: 202, headers: { 'x-message-id': ['arr-id-1', 'arr-id-2'] } },
+        {
+          statusCode: 202,
+          headers: { 'x-message-id': ['arr-id-1', 'arr-id-2'] },
+        },
       ]);
 
       const result = await prodService.send({

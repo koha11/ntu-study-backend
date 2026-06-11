@@ -13,7 +13,13 @@ import { CronJobRun } from '../modules/cron-jobs/entities/cron-job-run.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Task, User, Notification, CronJobRun, GroupEmailThread]),
+    TypeOrmModule.forFeature([
+      Task,
+      User,
+      Notification,
+      CronJobRun,
+      GroupEmailThread,
+    ]),
   ],
   providers: [
     EmailService,

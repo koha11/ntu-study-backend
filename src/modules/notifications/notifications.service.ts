@@ -22,7 +22,9 @@ export class NotificationsService {
         >
       >,
   ): Promise<Notification> {
-    this.logger.log(`Creating notification for ${data.recipient_id}: type=${data.type}`);
+    this.logger.log(
+      `Creating notification for ${data.recipient_id}: type=${data.type}`,
+    );
     const notification = this.notificationsRepository.create({
       recipient_id: data.recipient_id,
       type: data.type,

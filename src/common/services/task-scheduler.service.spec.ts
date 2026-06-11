@@ -85,8 +85,14 @@ describe('TaskSchedulerService', () => {
         TaskSchedulerService,
         { provide: getRepositoryToken(Task), useValue: tasksRepository },
         { provide: getRepositoryToken(User), useValue: usersRepository },
-        { provide: getRepositoryToken(Notification), useValue: notificationsRepository },
-        { provide: getRepositoryToken(CronJobRun), useValue: cronJobRunsRepository },
+        {
+          provide: getRepositoryToken(Notification),
+          useValue: notificationsRepository,
+        },
+        {
+          provide: getRepositoryToken(CronJobRun),
+          useValue: cronJobRunsRepository,
+        },
         { provide: EmailService, useValue: emailService },
         { provide: GroupEmailThreadService, useValue: groupEmailThreadService },
       ],
@@ -152,7 +158,10 @@ describe('TaskSchedulerService', () => {
     });
 
     it('skips tasks without assignee', async () => {
-      const taskWithoutAssignee = makeTask({ assignee: null as unknown as User, assignee_id: null as unknown as string });
+      const taskWithoutAssignee = makeTask({
+        assignee: null as unknown as User,
+        assignee_id: null as unknown as string,
+      });
       tasksRepository.find.mockResolvedValue([taskWithoutAssignee]);
 
       await service.sendOverdueTaskReminders();
@@ -180,7 +189,10 @@ describe('TaskSchedulerService', () => {
 
     it('sends email for personal overdue tasks when notifications enabled', async () => {
       const user = makeUser({ notification_enabled: true });
-      const task = makeTask({ group_id: null, due_date: new Date('2020-01-01') });
+      const task = makeTask({
+        group_id: null,
+        due_date: new Date('2020-01-01'),
+      });
       tasksRepository.find.mockResolvedValue([task]);
       usersRepository.findOne.mockResolvedValue(user);
 
@@ -195,7 +207,10 @@ describe('TaskSchedulerService', () => {
     });
 
     it('sends email in Vietnamese when user preferred_language is not en', async () => {
-      const user = makeUser({ notification_enabled: true, preferred_language: 'vi' });
+      const user = makeUser({
+        notification_enabled: true,
+        preferred_language: 'vi',
+      });
       const task = makeTask({ due_date: new Date('2020-01-01') });
       tasksRepository.find.mockResolvedValue([task]);
       usersRepository.findOne.mockResolvedValue(user);

@@ -72,7 +72,11 @@ describe('AdminController', () => {
   });
 
   it('unlockUser forwards id to service', async () => {
-    adminService.unlockUser.mockResolvedValue({ id: 'uid', is_active: true, locked: false } as never);
+    adminService.unlockUser.mockResolvedValue({
+      id: 'uid',
+      is_active: true,
+      locked: false,
+    } as never);
     await controller.unlockUser('uid');
     expect(adminService.unlockUser).toHaveBeenCalledWith('uid');
   });
@@ -84,7 +88,11 @@ describe('AdminController', () => {
   });
 
   it('getDashboard delegates to service', async () => {
-    adminService.getDashboard.mockResolvedValue({ totals: {}, cron_jobs_last_7_days: [], recent_cron_runs: [] } as never);
+    adminService.getDashboard.mockResolvedValue({
+      totals: {},
+      cron_jobs_last_7_days: [],
+      recent_cron_runs: [],
+    } as never);
     await controller.getDashboard();
     expect(adminService.getDashboard).toHaveBeenCalled();
   });

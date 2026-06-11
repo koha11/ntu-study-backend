@@ -107,6 +107,16 @@ export class InviteMemberDto {
   email!: string;
 }
 
+export class LockGroupDto {}
+
+export class UnlockGroupDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(10)
+  @MaxLength(1000)
+  reason!: string;
+}
+
 /** POST /groups/:id/calendar/meet-event — ISO 8601 start/end from client */
 export class CreateMeetEventDto {
   @IsDateString()

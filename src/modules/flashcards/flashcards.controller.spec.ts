@@ -161,7 +161,11 @@ describe('FlashcardsController', () => {
   });
 
   it('updateFlashcard forwards ids and dto', async () => {
-    flashcardsService.updateFlashcard.mockResolvedValue({ id: cardId, front: 'New Q', back: 'New A' });
+    flashcardsService.updateFlashcard.mockResolvedValue({
+      id: cardId,
+      front: 'New Q',
+      back: 'New A',
+    });
 
     await controller.updateFlashcard(
       { user: { id: userId } } as never,
@@ -170,35 +174,53 @@ describe('FlashcardsController', () => {
       { front: 'New Q' } as never,
     );
 
-    expect(flashcardsService.updateFlashcard).toHaveBeenCalledWith(userId, setId, cardId, { front: 'New Q' });
+    expect(flashcardsService.updateFlashcard).toHaveBeenCalledWith(
+      userId,
+      setId,
+      cardId,
+      { front: 'New Q' },
+    );
   });
 
   it('updateSet forwards ids and dto', async () => {
-    flashcardsService.updateSet.mockResolvedValue({ id: setId, name: 'Updated', card_count: 2 });
+    flashcardsService.updateSet.mockResolvedValue({
+      id: setId,
+      name: 'Updated',
+      card_count: 2,
+    });
 
-    await controller.updateSet(
-      { user: { id: userId } } as never,
-      setId,
-      { name: 'Updated' } as never,
-    );
+    await controller.updateSet({ user: { id: userId } } as never, setId, {
+      name: 'Updated',
+    } as never);
 
-    expect(flashcardsService.updateSet).toHaveBeenCalledWith(userId, setId, { name: 'Updated' });
+    expect(flashcardsService.updateSet).toHaveBeenCalledWith(userId, setId, {
+      name: 'Updated',
+    });
   });
 
   it('getGroupSharedSets forwards user and group ids', async () => {
     flashcardsService.getGroupSharedSets.mockResolvedValue([]);
     const groupId = 'eeee-eeee-eeee-eeee';
 
-    await controller.getGroupSharedSets({ user: { id: userId } } as never, groupId);
+    await controller.getGroupSharedSets(
+      { user: { id: userId } } as never,
+      groupId,
+    );
 
-    expect(flashcardsService.getGroupSharedSets).toHaveBeenCalledWith(userId, groupId);
+    expect(flashcardsService.getGroupSharedSets).toHaveBeenCalledWith(
+      userId,
+      groupId,
+    );
   });
 
   it('shareSet delegates to service and maps response', async () => {
     const shareId = 'ffff-ffff-ffff-ffff';
     const groupId = 'gggg-gggg-gggg-gggg';
     flashcardsService.shareSetWithGroup.mockResolvedValue({
-      id: shareId, set_id: setId, group_id: groupId, created_at: new Date(),
+      id: shareId,
+      set_id: setId,
+      group_id: groupId,
+      created_at: new Date(),
     });
 
     const result = await controller.shareSet(
@@ -207,16 +229,32 @@ describe('FlashcardsController', () => {
       { group_id: groupId } as never,
     );
 
-    expect(flashcardsService.shareSetWithGroup).toHaveBeenCalledWith(userId, setId, groupId);
-    expect(result).toMatchObject({ share_id: shareId, set_id: setId, group_id: groupId });
+    expect(flashcardsService.shareSetWithGroup).toHaveBeenCalledWith(
+      userId,
+      setId,
+      groupId,
+    );
+    expect(result).toMatchObject({
+      share_id: shareId,
+      set_id: setId,
+      group_id: groupId,
+    });
   });
 
   it('unshareSet delegates to service', async () => {
     flashcardsService.unshareSetFromGroup.mockResolvedValue(undefined);
     const groupId = 'hhhh-hhhh-hhhh-hhhh';
 
-    await controller.unshareSet({ user: { id: userId } } as never, setId, groupId);
+    await controller.unshareSet(
+      { user: { id: userId } } as never,
+      setId,
+      groupId,
+    );
 
-    expect(flashcardsService.unshareSetFromGroup).toHaveBeenCalledWith(userId, setId, groupId);
+    expect(flashcardsService.unshareSetFromGroup).toHaveBeenCalledWith(
+      userId,
+      setId,
+      groupId,
+    );
   });
 });

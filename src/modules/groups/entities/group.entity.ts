@@ -61,6 +61,10 @@ export class Group extends BaseEntity {
   @Column({ type: 'varchar', length: 512, nullable: true })
   google_calendar_id?: string | null;
 
+  /** Timestamp when the group was locked; null when active. */
+  @Column({ type: 'timestamptz', nullable: true })
+  locked_at?: Date | null;
+
   // Relationships
   @OneToMany(() => GroupMember, (member) => member.group, { cascade: true })
   members!: GroupMember[];

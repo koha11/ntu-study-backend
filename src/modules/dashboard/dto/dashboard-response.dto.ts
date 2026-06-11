@@ -50,8 +50,10 @@ export class CalendarEventStartEndDto {
 export class UpcomingCalendarEventDto {
   @ApiProperty() id!: string;
   @ApiProperty() summary!: string;
-  @ApiProperty({ type: CalendarEventStartEndDto }) start!: CalendarEventStartEndDto;
-  @ApiProperty({ type: CalendarEventStartEndDto }) end!: CalendarEventStartEndDto;
+  @ApiProperty({ type: CalendarEventStartEndDto })
+  start!: CalendarEventStartEndDto;
+  @ApiProperty({ type: CalendarEventStartEndDto })
+  end!: CalendarEventStartEndDto;
   @ApiProperty() htmlLink!: string;
   @ApiProperty() groupId!: string;
   @ApiProperty() groupName!: string;
@@ -61,17 +63,26 @@ export class UpcomingItemDto {
   @ApiProperty({ enum: ['task', 'calendar_event'] })
   kind!: 'task' | 'calendar_event';
 
-  @ApiProperty({ description: 'ISO 8601 date of the task due date or event start' })
+  @ApiProperty({
+    description: 'ISO 8601 date of the task due date or event start',
+  })
   date!: string;
 
   @ApiPropertyOptional({ type: UpcomingTaskDto }) task?: UpcomingTaskDto;
-  @ApiPropertyOptional({ type: UpcomingCalendarEventDto }) calendarEvent?: UpcomingCalendarEventDto;
+  @ApiPropertyOptional({ type: UpcomingCalendarEventDto })
+  calendarEvent?: UpcomingCalendarEventDto;
 }
 
 export class DashboardResponseDto {
-  @ApiProperty({ type: [RecentActivityItemDto], description: 'Up to 10 items, newest first' })
+  @ApiProperty({
+    type: [RecentActivityItemDto],
+    description: 'Up to 10 items, newest first',
+  })
   recentActivity!: RecentActivityItemDto[];
 
-  @ApiProperty({ type: [UpcomingItemDto], description: 'Sorted by date ascending' })
+  @ApiProperty({
+    type: [UpcomingItemDto],
+    description: 'Sorted by date ascending',
+  })
   upcoming!: UpcomingItemDto[];
 }

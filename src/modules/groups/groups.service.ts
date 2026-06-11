@@ -260,6 +260,90 @@ export class GroupsService {
     return group;
   }
 
+  async lockGroup(groupId: string, leaderId: string): Promise<Group> {
+    const group = await this.requireGroup(groupId);
+    this.assertLeader(group, leaderId);
+
+    if (group.status === GroupStatus.LOCKED) {
+      throw new BadRequestException('Group is already locked');
+    }
+    if (!group.report_date) {
+      throw new BadRequestException(
+        'Set a report date before locking the group',
+      );
+    }
+    const reportDateMs = new Date(group.report_date).setHours(0, 0, 0, 0);
+    if (reportDateMs > Date.now()) {
+      throw new BadRequestException(
+        'Group can only be locked after the report date has passed',
+      );
+    }
+
+    group.status = GroupStatus.LOCKED;
+    group.locked_at = new Date();
+    const saved = await this.groupsRepository.save(group);
+
+    const leader = await this.usersService.findById(leaderId);
+    const allEmails = await this.getActiveMemberEmails(groupId);
+    if (allEmails.length > 0 && leader) {
+      const base =
+        this.configService.get<string>('FRONTEND_URL')?.replace(/\/$/, '') ??
+        'http://localhost:5173';
+      this.emailService
+        .sendGroupLockedEmail({
+          toEmails: allEmails,
+          groupName: group.name,
+          leaderName: leader.full_name,
+          groupUrl: `${base}/groups/${groupId}`,
+        })
+        .catch((err: unknown) =>
+          this.logger.error(`Lock email failed: ${String(err)}`),
+        );
+    }
+
+    this.logger.log(`Group ${groupId} locked by ${leaderId}`);
+    return saved;
+  }
+
+  async unlockGroup(
+    groupId: string,
+    leaderId: string,
+    reason: string,
+  ): Promise<Group> {
+    const group = await this.requireGroup(groupId);
+    this.assertLeader(group, leaderId);
+
+    if (group.status !== GroupStatus.LOCKED) {
+      throw new BadRequestException('Group is not locked');
+    }
+
+    group.status = GroupStatus.ACTIVE;
+    group.locked_at = null;
+    const saved = await this.groupsRepository.save(group);
+
+    const leader = await this.usersService.findById(leaderId);
+    const allEmails = await this.getActiveMemberEmails(groupId);
+    if (allEmails.length > 0 && leader) {
+      const base =
+        this.configService.get<string>('FRONTEND_URL')?.replace(/\/$/, '') ??
+        'http://localhost:5173';
+      this.emailService
+        .sendGroupUnlockedEmail({
+          toEmails: allEmails,
+          groupName: group.name,
+          leaderName: leader.full_name,
+          reason,
+          groupUrl: `${base}/groups/${groupId}`,
+        })
+        .catch((err: unknown) =>
+          this.logger.error(`Unlock email failed: ${String(err)}`),
+        );
+    }
+
+    this.logger.log(`Group ${groupId} unlocked by ${leaderId}`);
+    return saved;
+  }
+
   async update(
     groupId: string,
     actingUserId: string,
@@ -267,6 +351,7 @@ export class GroupsService {
   ): Promise<Group> {
     const group = await this.requireGroup(groupId);
     this.assertLeader(group, actingUserId);
+    this.assertGroupNotLocked(group);
 
     if (dto.name !== undefined) {
       group.name = dto.name.trim();
@@ -705,6 +790,7 @@ export class GroupsService {
   ): Promise<GroupInvitation> {
     const group = await this.requireGroup(groupId);
     this.assertLeader(group, leaderId);
+    this.assertGroupNotLocked(group);
     const normalized = email.trim().toLowerCase();
     const existingUser = await this.usersService.findByEmail(normalized);
     if (existingUser) {
@@ -732,6 +818,7 @@ export class GroupsService {
   ): Promise<GroupMember> {
     const group = await this.requireGroup(groupId);
     this.assertLeader(group, leaderId);
+    this.assertGroupNotLocked(group);
     if (targetUserId === group.leader_id) {
       throw new ForbiddenException('Cannot change leader membership status');
     }
@@ -756,6 +843,7 @@ export class GroupsService {
   ): Promise<void> {
     const group = await this.requireGroup(groupId);
     this.assertLeader(group, leaderId);
+    this.assertGroupNotLocked(group);
     if (targetUserId === group.leader_id) {
       throw new ForbiddenException('Cannot remove the group leader');
     }
@@ -769,6 +857,24 @@ export class GroupsService {
     this.logger.log(
       `Member ${targetUserId} removed from group ${groupId} by ${leaderId}`,
     );
+  }
+
+  private assertGroupNotLocked(group: Group): void {
+    if (group.status === GroupStatus.LOCKED) {
+      throw new ForbiddenException(
+        'This group is locked and cannot be modified',
+      );
+    }
+  }
+
+  private async getActiveMemberEmails(groupId: string): Promise<string[]> {
+    const memberships = await this.membersRepository.find({
+      where: { group_id: groupId, is_active: true },
+      relations: ['user'],
+    });
+    return memberships
+      .map((m) => m.user?.email?.trim().toLowerCase())
+      .filter((e): e is string => Boolean(e));
   }
 
   private async requireGroup(groupId: string): Promise<Group> {

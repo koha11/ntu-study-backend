@@ -614,7 +614,10 @@ describe('TasksService', () => {
 
   describe('create — notification side-effects', () => {
     it('skips notification when assignee is the same as the creator (self-assignment)', async () => {
-      membersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
+      membersRepository.findOne.mockResolvedValue({
+        group_id: groupId,
+        user_id: userId,
+      });
       tasksRepository.save.mockImplementation((t: Task) =>
         Promise.resolve({ ...t, id: taskId }),
       );
@@ -642,7 +645,10 @@ describe('TasksService', () => {
     });
 
     it('sends notification when assigned to a different member', async () => {
-      membersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
+      membersRepository.findOne.mockResolvedValue({
+        group_id: groupId,
+        user_id: userId,
+      });
       tasksRepository.save.mockImplementation((t: Task) =>
         Promise.resolve({ ...t, id: taskId }),
       );
@@ -658,11 +664,16 @@ describe('TasksService', () => {
         subtasks: [],
       });
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, name: 'Group', leader_id: userId,
+        id: groupId,
+        name: 'Group',
+        leader_id: userId,
       } as Group);
       usersService.findOne.mockResolvedValue({
-        id: otherUserId, email: 'other@t.com', full_name: 'Other',
-        notification_enabled: true, preferred_language: 'en',
+        id: otherUserId,
+        email: 'other@t.com',
+        full_name: 'Other',
+        notification_enabled: true,
+        preferred_language: 'en',
       });
       groupEmailThreadService.findByGroupAndUser.mockResolvedValue(null);
 
@@ -678,7 +689,10 @@ describe('TasksService', () => {
     });
 
     it('skips email notification when assignee has notifications disabled', async () => {
-      membersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
+      membersRepository.findOne.mockResolvedValue({
+        group_id: groupId,
+        user_id: userId,
+      });
       tasksRepository.save.mockImplementation((t: Task) =>
         Promise.resolve({ ...t, id: taskId }),
       );
@@ -694,15 +708,22 @@ describe('TasksService', () => {
         subtasks: [],
       });
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, name: 'Group', leader_id: userId,
+        id: groupId,
+        name: 'Group',
+        leader_id: userId,
       } as Group);
       usersService.findOne.mockResolvedValue({
-        id: otherUserId, email: 'other@t.com', full_name: 'Other',
-        notification_enabled: false, preferred_language: 'en',
+        id: otherUserId,
+        email: 'other@t.com',
+        full_name: 'Other',
+        notification_enabled: false,
+        preferred_language: 'en',
       });
 
       await service.create(userId, {
-        title: 'T', group_id: groupId, assignee_id: otherUserId,
+        title: 'T',
+        group_id: groupId,
+        assignee_id: otherUserId,
       });
 
       // In-app created but email skipped
@@ -715,14 +736,19 @@ describe('TasksService', () => {
     it('skips notification if group not found', async () => {
       tasksRepository.findOne
         .mockResolvedValueOnce({
-          id: taskId, group_id: groupId,
+          id: taskId,
+          group_id: groupId,
           status: TaskStatus.IN_PROGRESS,
-          assignee_id: userId, created_by_id: userId,
+          assignee_id: userId,
+          created_by_id: userId,
         })
         .mockResolvedValueOnce({
-          id: taskId, group_id: groupId,
+          id: taskId,
+          group_id: groupId,
           status: TaskStatus.PENDING_REVIEW,
-          submitted_at: new Date(), assignee_id: userId, created_by_id: userId,
+          submitted_at: new Date(),
+          assignee_id: userId,
+          created_by_id: userId,
         });
       tasksRepository.save.mockImplementation((t: Task) => Promise.resolve(t));
       groupsRepository.findOne.mockResolvedValue(null);
@@ -780,9 +806,9 @@ describe('TasksService', () => {
       groupsRepository.findOne.mockResolvedValue(null);
       const qb = tasksRepository.createQueryBuilder();
 
-      await expect(
-        service.findGroupTasks(groupId, userId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findGroupTasks(groupId, userId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -793,27 +819,45 @@ describe('TasksService', () => {
     it('sends Vietnamese notification when leader preferred_language is vi', async () => {
       const viLeaderId = 'vivi-vivi-vivi-vivi-vivivivivivi';
       const existing = {
-        id: taskId, group_id: groupId,
+        id: taskId,
+        group_id: groupId,
         status: TaskStatus.IN_PROGRESS,
-        assignee_id: userId, created_by_id: userId,
+        assignee_id: userId,
+        created_by_id: userId,
       };
-      const afterSubmit = { ...existing, status: TaskStatus.PENDING_REVIEW, submitted_at: new Date() };
+      const afterSubmit = {
+        ...existing,
+        status: TaskStatus.PENDING_REVIEW,
+        submitted_at: new Date(),
+      };
       tasksRepository.findOne
         .mockResolvedValueOnce({ ...existing })
         .mockResolvedValueOnce(afterSubmit as Task);
-      tasksRepository.save.mockImplementation((t: Task) => Promise.resolve({ ...existing, ...t }));
+      tasksRepository.save.mockImplementation((t: Task) =>
+        Promise.resolve({ ...existing, ...t }),
+      );
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: viLeaderId, name: 'Nhóm học',
+        id: groupId,
+        leader_id: viLeaderId,
+        name: 'Nhóm học',
       } as Group);
       usersService.findOne.mockImplementation((id: string) => {
-        if (id === viLeaderId) return Promise.resolve({
-          id: viLeaderId, email: 'leader@t.com', full_name: 'Trưởng nhóm',
-          notification_enabled: true, preferred_language: 'vi',
-        });
-        if (id === userId) return Promise.resolve({
-          id: userId, email: 'u@t.com', full_name: 'Thành viên',
-          notification_enabled: true, preferred_language: 'vi',
-        });
+        if (id === viLeaderId)
+          return Promise.resolve({
+            id: viLeaderId,
+            email: 'leader@t.com',
+            full_name: 'Trưởng nhóm',
+            notification_enabled: true,
+            preferred_language: 'vi',
+          });
+        if (id === userId)
+          return Promise.resolve({
+            id: userId,
+            email: 'u@t.com',
+            full_name: 'Thành viên',
+            notification_enabled: true,
+            preferred_language: 'vi',
+          });
         return Promise.resolve(null);
       });
       groupEmailThreadService.findByGroupAndUser.mockResolvedValue(null);
@@ -830,29 +874,49 @@ describe('TasksService', () => {
     it('sends Vietnamese notification when assignee preferred_language is vi', async () => {
       const viAssigneeId = 'vvvv-vvvv-vvvv-vvvv-vvvvvvvvvvvv';
       const existing = {
-        id: taskId, group_id: groupId,
-        status: TaskStatus.PENDING_REVIEW, assignee_id: viAssigneeId,
+        id: taskId,
+        group_id: groupId,
+        status: TaskStatus.PENDING_REVIEW,
+        assignee_id: viAssigneeId,
       };
-      const reviewed = { ...existing, status: TaskStatus.FAILED, reviewed_at: new Date(), reviewed_by_id: userId };
+      const reviewed = {
+        ...existing,
+        status: TaskStatus.FAILED,
+        reviewed_at: new Date(),
+        reviewed_by_id: userId,
+      };
       tasksRepository.findOne
         .mockResolvedValueOnce({ ...existing })
         .mockResolvedValueOnce(reviewed as Task);
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: userId, name: 'Nhóm học',
+        id: groupId,
+        leader_id: userId,
+        name: 'Nhóm học',
       } as Group);
       tasksRepository.save.mockImplementation((t: Task) => Promise.resolve(t));
       usersService.findOne.mockResolvedValue({
-        id: viAssigneeId, email: 'assignee@t.com', full_name: 'Thành viên',
-        notification_enabled: true, preferred_language: 'vi',
+        id: viAssigneeId,
+        email: 'assignee@t.com',
+        full_name: 'Thành viên',
+        notification_enabled: true,
+        preferred_language: 'vi',
       });
 
-      await service.approveTask(taskId, userId, TaskStatus.FAILED, 'Chưa đạt yêu cầu');
+      await service.approveTask(
+        taskId,
+        userId,
+        TaskStatus.FAILED,
+        'Chưa đạt yêu cầu',
+      );
 
       expect(notificationsService.createNotification).toHaveBeenCalledWith(
         expect.objectContaining({ recipient_id: viAssigneeId }),
       );
       expect(emailService.sendTaskReviewResultEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'failed', comment: 'Chưa đạt yêu cầu' }),
+        expect.objectContaining({
+          outcome: 'failed',
+          comment: 'Chưa đạt yêu cầu',
+        }),
       );
     });
   });
@@ -861,11 +925,15 @@ describe('TasksService', () => {
   describe('update — editor assigns task to themselves (sendAssigneeTaskAssigned early return)', () => {
     it('does not notify when editor reassigns the task to themselves', async () => {
       tasksRepository.findOne.mockResolvedValue({
-        id: taskId, group_id: groupId,
-        created_by_id: userId, assignee_id: otherUserId,
+        id: taskId,
+        group_id: groupId,
+        created_by_id: userId,
+        assignee_id: otherUserId,
         status: TaskStatus.TODO,
       });
-      tasksRepository.save.mockImplementation((t: Task) => Promise.resolve({ ...t, id: taskId }));
+      tasksRepository.save.mockImplementation((t: Task) =>
+        Promise.resolve({ ...t, id: taskId }),
+      );
       groupsRepository.findOne
         .mockResolvedValueOnce({ id: groupId, leader_id: userId }) // assertCanEditTask
         .mockResolvedValueOnce({ id: groupId, leader_id: userId, name: 'G' }); // sendAssigneeTaskAssigned
@@ -881,11 +949,15 @@ describe('TasksService', () => {
   describe('update — group not found in sendAssigneeTaskAssigned', () => {
     it('silently skips notification when group not found during notification', async () => {
       tasksRepository.findOne.mockResolvedValue({
-        id: taskId, group_id: groupId,
-        created_by_id: userId, assignee_id: userId, // currently assigned to creator
+        id: taskId,
+        group_id: groupId,
+        created_by_id: userId,
+        assignee_id: userId, // currently assigned to creator
         status: TaskStatus.TODO,
       });
-      tasksRepository.save.mockImplementation((t: Task) => Promise.resolve({ ...t, id: taskId }));
+      tasksRepository.save.mockImplementation((t: Task) =>
+        Promise.resolve({ ...t, id: taskId }),
+      );
       groupsRepository.findOne
         .mockResolvedValueOnce({ id: groupId, leader_id: userId }) // assertCanEditTask pass
         .mockResolvedValueOnce(null); // sendAssigneeTaskAssigned: group not found
@@ -900,18 +972,36 @@ describe('TasksService', () => {
   // sendAssigneeTaskAssigned — assignee not found (line 392)
   describe('create — assignee not found after group lookup', () => {
     it('skips notification when usersService.findOne returns null for assignee', async () => {
-      membersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
-      tasksRepository.save.mockImplementation((t: Task) => Promise.resolve({ ...t, id: taskId }));
-      tasksRepository.findOne.mockResolvedValue({
-        id: taskId, group_id: groupId,
-        assignee_id: otherUserId, created_by_id: userId,
-        title: 'T', status: TaskStatus.TODO,
-        assignee: { id: otherUserId }, parent_task: null, subtasks: [],
+      membersRepository.findOne.mockResolvedValue({
+        group_id: groupId,
+        user_id: userId,
       });
-      groupsRepository.findOne.mockResolvedValue({ id: groupId, name: 'G', leader_id: userId } as Group);
+      tasksRepository.save.mockImplementation((t: Task) =>
+        Promise.resolve({ ...t, id: taskId }),
+      );
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: groupId,
+        assignee_id: otherUserId,
+        created_by_id: userId,
+        title: 'T',
+        status: TaskStatus.TODO,
+        assignee: { id: otherUserId },
+        parent_task: null,
+        subtasks: [],
+      });
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'G',
+        leader_id: userId,
+      } as Group);
       usersService.findOne.mockResolvedValue(null);
 
-      await service.create(userId, { title: 'T', group_id: groupId, assignee_id: otherUserId });
+      await service.create(userId, {
+        title: 'T',
+        group_id: groupId,
+        assignee_id: otherUserId,
+      });
 
       expect(notificationsService.createNotification).not.toHaveBeenCalled();
     });
@@ -921,12 +1011,19 @@ describe('TasksService', () => {
   describe('update — same assignee does not trigger notification', () => {
     it('skips notification when assignee has not changed', async () => {
       tasksRepository.findOne.mockResolvedValue({
-        id: taskId, group_id: groupId,
-        created_by_id: userId, assignee_id: otherUserId,
+        id: taskId,
+        group_id: groupId,
+        created_by_id: userId,
+        assignee_id: otherUserId,
         status: TaskStatus.TODO,
       });
-      tasksRepository.save.mockImplementation((t: Task) => Promise.resolve({ ...t, id: taskId }));
-      groupsRepository.findOne.mockResolvedValue({ id: groupId, leader_id: userId } as Group);
+      tasksRepository.save.mockImplementation((t: Task) =>
+        Promise.resolve({ ...t, id: taskId }),
+      );
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        leader_id: userId,
+      } as Group);
 
       await service.update(taskId, userId, { assignee_id: otherUserId });
 
@@ -939,12 +1036,19 @@ describe('TasksService', () => {
   describe('update — self-assignment triggers no notification', () => {
     it('does not notify when editor assigns the task to themselves', async () => {
       tasksRepository.findOne.mockResolvedValue({
-        id: taskId, group_id: groupId,
-        created_by_id: userId, assignee_id: userId,
+        id: taskId,
+        group_id: groupId,
+        created_by_id: userId,
+        assignee_id: userId,
         status: TaskStatus.TODO,
       });
-      tasksRepository.save.mockImplementation((t: Task) => Promise.resolve({ ...t, id: taskId }));
-      groupsRepository.findOne.mockResolvedValue({ id: groupId, leader_id: userId } as Group);
+      tasksRepository.save.mockImplementation((t: Task) =>
+        Promise.resolve({ ...t, id: taskId }),
+      );
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        leader_id: userId,
+      } as Group);
 
       // Assign task to themselves (same as editor)
       await service.update(taskId, userId, { assignee_id: userId });
@@ -958,13 +1062,23 @@ describe('TasksService', () => {
     it('returns group task when user is an active member (not leader)', async () => {
       const memberId = 'memm-memm-memm-memm-memmmmmmmmm';
       tasksRepository.findOne.mockResolvedValueOnce({
-        id: taskId, group_id: groupId,
-        created_by_id: userId, assignee_id: userId,
+        id: taskId,
+        group_id: groupId,
+        created_by_id: userId,
+        assignee_id: userId,
         status: TaskStatus.TODO,
-        parent_task: null, subtasks: [],
+        parent_task: null,
+        subtasks: [],
       });
-      groupsRepository.findOne.mockResolvedValue({ id: groupId, leader_id: userId } as Group);
-      membersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: memberId, is_active: true });
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        leader_id: userId,
+      } as Group);
+      membersRepository.findOne.mockResolvedValue({
+        group_id: groupId,
+        user_id: memberId,
+        is_active: true,
+      });
 
       const result = await service.findOne(taskId, memberId);
 
@@ -975,7 +1089,8 @@ describe('TasksService', () => {
   describe('assertCanViewGroup — leader bypass', () => {
     it('allows group leader to view group tasks without membership check', async () => {
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: userId,
+        id: groupId,
+        leader_id: userId,
       } as Group);
       const qb = tasksRepository.createQueryBuilder();
 
@@ -989,14 +1104,22 @@ describe('TasksService', () => {
   describe('approveTask — assignee not found', () => {
     it('skips notification if assignee user not found', async () => {
       const existing = {
-        id: taskId, group_id: groupId,
-        status: TaskStatus.PENDING_REVIEW, assignee_id: otherUserId,
+        id: taskId,
+        group_id: groupId,
+        status: TaskStatus.PENDING_REVIEW,
+        assignee_id: otherUserId,
       };
       tasksRepository.findOne
         .mockResolvedValueOnce({ ...existing })
-        .mockResolvedValueOnce({ ...existing, status: TaskStatus.DONE, reviewed_by_id: userId });
+        .mockResolvedValueOnce({
+          ...existing,
+          status: TaskStatus.DONE,
+          reviewed_by_id: userId,
+        });
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: userId, name: 'Team',
+        id: groupId,
+        leader_id: userId,
+        name: 'Team',
       } as Group);
       tasksRepository.save.mockImplementation((t: Task) => Promise.resolve(t));
       usersService.findOne.mockResolvedValue(null);
@@ -1009,19 +1132,37 @@ describe('TasksService', () => {
   });
 
   describe('approveTask — notification branches', () => {
-    const setupApprove = (status: TaskStatus, assigneeLang: string, notifEnabled: boolean, comment?: string) => {
+    const setupApprove = (
+      status: TaskStatus,
+      assigneeLang: string,
+      notifEnabled: boolean,
+      comment?: string,
+    ) => {
       const existing = {
-        id: taskId, group_id: groupId,
-        status: TaskStatus.PENDING_REVIEW, assignee_id: otherUserId,
+        id: taskId,
+        group_id: groupId,
+        status: TaskStatus.PENDING_REVIEW,
+        assignee_id: otherUserId,
       };
       tasksRepository.findOne
         .mockResolvedValueOnce({ ...existing })
-        .mockResolvedValueOnce({ ...existing, status, reviewed_by_id: userId } as Task);
-      groupsRepository.findOne.mockResolvedValue({ id: groupId, leader_id: userId, name: 'Group' } as Group);
+        .mockResolvedValueOnce({
+          ...existing,
+          status,
+          reviewed_by_id: userId,
+        } as Task);
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        leader_id: userId,
+        name: 'Group',
+      } as Group);
       tasksRepository.save.mockImplementation((t: Task) => Promise.resolve(t));
       usersService.findOne.mockResolvedValue({
-        id: otherUserId, email: 'a@t.com', full_name: 'Assignee',
-        notification_enabled: notifEnabled, preferred_language: assigneeLang,
+        id: otherUserId,
+        email: 'a@t.com',
+        full_name: 'Assignee',
+        notification_enabled: notifEnabled,
+        preferred_language: assigneeLang,
       });
       groupEmailThreadService.findByGroupAndUser.mockResolvedValue(null);
     };
@@ -1036,9 +1177,18 @@ describe('TasksService', () => {
 
     it('sends FAILED notification in VI with comment when language is vi', async () => {
       setupApprove(TaskStatus.FAILED, 'vi', true, 'needs improvement');
-      await service.approveTask(taskId, userId, TaskStatus.FAILED, 'needs improvement');
+      await service.approveTask(
+        taskId,
+        userId,
+        TaskStatus.FAILED,
+        'needs improvement',
+      );
       expect(emailService.sendTaskReviewResultEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'failed', lang: 'vi', comment: 'needs improvement' }),
+        expect.objectContaining({
+          outcome: 'failed',
+          lang: 'vi',
+          comment: 'needs improvement',
+        }),
       );
     });
 
@@ -1051,13 +1201,23 @@ describe('TasksService', () => {
 
     it('skips notification when task has no assignee_id', async () => {
       const noAssignee = {
-        id: taskId, group_id: groupId,
-        status: TaskStatus.PENDING_REVIEW, assignee_id: null,
+        id: taskId,
+        group_id: groupId,
+        status: TaskStatus.PENDING_REVIEW,
+        assignee_id: null,
       };
       tasksRepository.findOne
         .mockResolvedValueOnce({ ...noAssignee })
-        .mockResolvedValueOnce({ ...noAssignee, status: TaskStatus.DONE, reviewed_by_id: userId } as unknown as Task);
-      groupsRepository.findOne.mockResolvedValue({ id: groupId, leader_id: userId, name: 'G' } as Group);
+        .mockResolvedValueOnce({
+          ...noAssignee,
+          status: TaskStatus.DONE,
+          reviewed_by_id: userId,
+        } as unknown as Task);
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        leader_id: userId,
+        name: 'G',
+      } as Group);
       tasksRepository.save.mockImplementation((t: Task) => Promise.resolve(t));
 
       await service.approveTask(taskId, userId, TaskStatus.DONE);
@@ -1068,22 +1228,39 @@ describe('TasksService', () => {
   describe('submitTask — leader notification branches', () => {
     it('skips pending-review email when leader notifications are disabled', async () => {
       const existing = {
-        id: taskId, group_id: groupId,
-        status: TaskStatus.IN_PROGRESS, assignee_id: userId, created_by_id: userId,
+        id: taskId,
+        group_id: groupId,
+        status: TaskStatus.IN_PROGRESS,
+        assignee_id: userId,
+        created_by_id: userId,
       };
       tasksRepository.findOne
         .mockResolvedValueOnce({ ...existing })
-        .mockResolvedValueOnce({ ...existing, status: TaskStatus.PENDING_REVIEW, submitted_at: new Date() });
+        .mockResolvedValueOnce({
+          ...existing,
+          status: TaskStatus.PENDING_REVIEW,
+          submitted_at: new Date(),
+        });
       tasksRepository.save.mockImplementation((t: Task) => Promise.resolve(t));
       groupsRepository.findOne.mockResolvedValue({
-        id: groupId, leader_id: otherUserId, name: 'Group',
+        id: groupId,
+        leader_id: otherUserId,
+        name: 'Group',
       } as Group);
       usersService.findOne.mockImplementation((id: string) => {
-        if (id === otherUserId) return Promise.resolve({
-          id: otherUserId, email: 'leader@t.com', full_name: 'Leader',
-          notification_enabled: false, preferred_language: 'en',
+        if (id === otherUserId)
+          return Promise.resolve({
+            id: otherUserId,
+            email: 'leader@t.com',
+            full_name: 'Leader',
+            notification_enabled: false,
+            preferred_language: 'en',
+          });
+        return Promise.resolve({
+          id: userId,
+          full_name: 'User',
+          preferred_language: 'en',
         });
-        return Promise.resolve({ id: userId, full_name: 'User', preferred_language: 'en' });
       });
 
       await service.submitTask(taskId, userId);

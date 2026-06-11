@@ -47,7 +47,9 @@ export class DashboardService {
     const groups = await this.findUserGroupsFull(userId);
 
     const now = new Date();
-    const timeMax = new Date(now.getTime() + UPCOMING_DAYS * 24 * 60 * 60 * 1000);
+    const timeMax = new Date(
+      now.getTime() + UPCOMING_DAYS * 24 * 60 * 60 * 1000,
+    );
 
     const [notifResult, driveResult, taskResult, calendarResult] =
       await Promise.allSettled([
@@ -153,7 +155,9 @@ export class DashboardService {
           title: task.title,
           status: task.status,
           groupId: task.group_id ?? '',
-          groupName: task.group_id ? (groupNameById.get(task.group_id) ?? '') : '',
+          groupName: task.group_id
+            ? (groupNameById.get(task.group_id) ?? '')
+            : '',
         },
       });
     }
@@ -217,7 +221,12 @@ export class DashboardService {
       return { groupId: group.id, groupName: group.name, events: [] };
     }
     const events = await this.googleCalendarService
-      .listEventsInRange(token, calendarId, new Date(timeMinIso), new Date(timeMaxIso))
+      .listEventsInRange(
+        token,
+        calendarId,
+        new Date(timeMinIso),
+        new Date(timeMaxIso),
+      )
       .catch(() => []);
     return { groupId: group.id, groupName: group.name, events };
   }

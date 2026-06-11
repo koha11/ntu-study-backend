@@ -95,11 +95,16 @@ export class FlashcardsService {
       card_count: 0,
     });
     const saved = await this.setsRepository.save(entity);
-    this.logger.log(`Flashcard set created: "${data.name}" (id=${saved.id}) for user ${userId}`);
+    this.logger.log(
+      `Flashcard set created: "${data.name}" (id=${saved.id}) for user ${userId}`,
+    );
     return saved;
   }
 
-  private async isSetAccessibleByUser(setId: string, userId: string): Promise<boolean> {
+  private async isSetAccessibleByUser(
+    setId: string,
+    userId: string,
+  ): Promise<boolean> {
     const shared = await this.sharedRepository
       .createQueryBuilder('s')
       .innerJoin(
@@ -124,7 +129,9 @@ export class FlashcardsService {
     if (set.owner_id !== userId) {
       const accessible = await this.isSetAccessibleByUser(setId, userId);
       if (!accessible) {
-        throw new ForbiddenException('You do not have access to this flashcard set');
+        throw new ForbiddenException(
+          'You do not have access to this flashcard set',
+        );
       }
     }
     return set;
@@ -174,7 +181,9 @@ export class FlashcardsService {
     });
     const saved = await this.cardsRepository.save(card);
     await this.setsRepository.increment({ id: setId }, 'card_count', 1);
-    this.logger.log(`Flashcard added (id=${saved.id}) to set ${setId} for user ${userId}`);
+    this.logger.log(
+      `Flashcard added (id=${saved.id}) to set ${setId} for user ${userId}`,
+    );
     return saved;
   }
 
@@ -273,7 +282,9 @@ export class FlashcardsService {
     if (set.owner_id !== userId) {
       const accessible = await this.isSetAccessibleByUser(setId, userId);
       if (!accessible) {
-        throw new ForbiddenException('You do not have access to this flashcard set');
+        throw new ForbiddenException(
+          'You do not have access to this flashcard set',
+        );
       }
     }
 
@@ -305,7 +316,9 @@ export class FlashcardsService {
     if (set.owner_id !== userId) {
       const accessible = await this.isSetAccessibleByUser(setId, userId);
       if (!accessible) {
-        throw new ForbiddenException('You do not have access to this flashcard set');
+        throw new ForbiddenException(
+          'You do not have access to this flashcard set',
+        );
       }
     }
 
@@ -319,7 +332,9 @@ export class FlashcardsService {
       next_review_at: nextAt,
     });
     const saved = await this.studyLogsRepository.save(log);
-    this.logger.log(`Study session completed: set ${setId} score ${data.score} for user ${userId}`);
+    this.logger.log(
+      `Study session completed: set ${setId} score ${data.score} for user ${userId}`,
+    );
     return saved;
   }
 
@@ -350,9 +365,14 @@ export class FlashcardsService {
       throw new ConflictException('This set is already shared with the group');
     }
 
-    const record = this.sharedRepository.create({ set_id: setId, group_id: groupId });
+    const record = this.sharedRepository.create({
+      set_id: setId,
+      group_id: groupId,
+    });
     const saved = await this.sharedRepository.save(record);
-    this.logger.log(`Flashcard set ${setId} shared with group ${groupId} by user ${userId}`);
+    this.logger.log(
+      `Flashcard set ${setId} shared with group ${groupId} by user ${userId}`,
+    );
     return saved;
   }
 
@@ -376,7 +396,9 @@ export class FlashcardsService {
       throw new NotFoundException('Shared record not found');
     }
     await this.sharedRepository.remove(record);
-    this.logger.log(`Flashcard set ${setId} unshared from group ${groupId} by user ${userId}`);
+    this.logger.log(
+      `Flashcard set ${setId} unshared from group ${groupId} by user ${userId}`,
+    );
   }
 
   async getGroupSharedSets(

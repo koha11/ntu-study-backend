@@ -18,7 +18,10 @@ describe('CanvaOAuthSessionStore', () => {
       store.setState('state-1', 'user-1', 'verifier-abc');
 
       const result = store.take('state-1');
-      expect(result).toEqual({ userId: 'user-1', codeVerifier: 'verifier-abc' });
+      expect(result).toEqual({
+        userId: 'user-1',
+        codeVerifier: 'verifier-abc',
+      });
     });
 
     it('returns undefined for an unknown state key', () => {

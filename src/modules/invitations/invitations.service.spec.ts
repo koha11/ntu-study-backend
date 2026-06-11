@@ -57,7 +57,9 @@ describe('InvitationsService', () => {
   const inviteeUserId = 'uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu';
   let configService: { get: ReturnType<typeof vi.fn> };
   let googleDriveService: { shareFile: ReturnType<typeof vi.fn> };
-  let googleCalendarService: { shareCalendarWithUser: ReturnType<typeof vi.fn> };
+  let googleCalendarService: {
+    shareCalendarWithUser: ReturnType<typeof vi.fn>;
+  };
   let googleAccessTokenService: {
     resolveGoogleAccessToken: ReturnType<typeof vi.fn>;
   };
@@ -126,7 +128,10 @@ describe('InvitationsService', () => {
 
     groupEmailThreadService = {
       findByGroupAndUser: vi.fn().mockResolvedValue(null),
-      create: vi.fn().mockResolvedValue({ id: 'thread-1', thread_message_id: '<inv@ntu-study.local>' }),
+      create: vi.fn().mockResolvedValue({
+        id: 'thread-1',
+        thread_message_id: '<inv@ntu-study.local>',
+      }),
     };
 
     configService = {
@@ -279,7 +284,11 @@ describe('InvitationsService', () => {
       membersRepository.findOne.mockResolvedValue(null);
       invitationsRepository.findOne.mockResolvedValue(null);
 
-      await service.createInvitation({ groupId, invitedByUserId: leaderId, email });
+      await service.createInvitation({
+        groupId,
+        invitedByUserId: leaderId,
+        email,
+      });
 
       expect(groupEmailThreadService.create).toHaveBeenCalledWith(
         groupId,
@@ -293,7 +302,11 @@ describe('InvitationsService', () => {
       usersService.findByEmail.mockResolvedValue(null);
       invitationsRepository.findOne.mockResolvedValue(null);
 
-      await service.createInvitation({ groupId, invitedByUserId: leaderId, email });
+      await service.createInvitation({
+        groupId,
+        invitedByUserId: leaderId,
+        email,
+      });
 
       expect(groupEmailThreadService.create).not.toHaveBeenCalled();
     });
@@ -306,7 +319,11 @@ describe('InvitationsService', () => {
       invitationsRepository.findOne.mockResolvedValue(null);
       emailService.sendGroupInvitation.mockResolvedValueOnce(null);
 
-      await service.createInvitation({ groupId, invitedByUserId: leaderId, email });
+      await service.createInvitation({
+        groupId,
+        invitedByUserId: leaderId,
+        email,
+      });
 
       expect(groupEmailThreadService.create).not.toHaveBeenCalled();
     });
@@ -412,11 +429,17 @@ describe('InvitationsService', () => {
         expires_at: new Date(Date.now() + 86400000),
         group: group as Group,
       };
-      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      invitationsRepository.findOne.mockResolvedValue(
+        invitation as GroupInvitation,
+      );
       usersService.findByEmail.mockResolvedValue(user as User);
-      membersRepository.findOne.mockResolvedValue({ user_id: inviteeUserId } as GroupMember);
+      membersRepository.findOne.mockResolvedValue({
+        user_id: inviteeUserId,
+      } as GroupMember);
 
-      await expect(service.acceptInvitation('dup', {})).rejects.toThrow(ConflictException);
+      await expect(service.acceptInvitation('dup', {})).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('auto-generates full_name from email when not provided', async () => {
@@ -429,7 +452,9 @@ describe('InvitationsService', () => {
         expires_at: new Date(Date.now() + 86400000),
         group: group as Group,
       };
-      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      invitationsRepository.findOne.mockResolvedValue(
+        invitation as GroupInvitation,
+      );
       usersService.findByEmail.mockResolvedValue(null);
       usersService.create.mockResolvedValue(created as User);
       membersRepository.findOne.mockResolvedValue(null);
@@ -613,8 +638,20 @@ describe('InvitationsService', () => {
     });
 
     it('shares group calendar with the new member when calendar is configured', async () => {
-      const user: Partial<User> = { id: inviteeUserId, email, full_name: 'Invitee', role: UserRole.USER, is_active: true, notification_enabled: true, created_at: new Date(), updated_at: new Date() };
-      const groupWithCalendar: Partial<Group> = { ...group, google_calendar_id: 'cal-id@group.calendar.google.com' };
+      const user: Partial<User> = {
+        id: inviteeUserId,
+        email,
+        full_name: 'Invitee',
+        role: UserRole.USER,
+        is_active: true,
+        notification_enabled: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+      const groupWithCalendar: Partial<Group> = {
+        ...group,
+        google_calendar_id: 'cal-id@group.calendar.google.com',
+      };
       const invitation: Partial<GroupInvitation> = {
         token: 'acc-cal',
         group_id: groupId,
@@ -624,11 +661,15 @@ describe('InvitationsService', () => {
         group: groupWithCalendar as Group,
       };
 
-      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      invitationsRepository.findOne.mockResolvedValue(
+        invitation as GroupInvitation,
+      );
       usersService.findByEmail.mockResolvedValue(user as User);
       membersRepository.findOne.mockResolvedValue(null);
       usersService.findById.mockResolvedValue(inviter as User);
-      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('leader-token');
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(
+        'leader-token',
+      );
 
       await service.acceptInvitation('acc-cal', {});
 
@@ -641,8 +682,20 @@ describe('InvitationsService', () => {
     });
 
     it('does not block invitation when calendar sharing fails', async () => {
-      const user: Partial<User> = { id: inviteeUserId, email, full_name: 'Invitee', role: UserRole.USER, is_active: true, notification_enabled: true, created_at: new Date(), updated_at: new Date() };
-      const groupWithCalendar: Partial<Group> = { ...group, google_calendar_id: 'cal-id@group.calendar.google.com' };
+      const user: Partial<User> = {
+        id: inviteeUserId,
+        email,
+        full_name: 'Invitee',
+        role: UserRole.USER,
+        is_active: true,
+        notification_enabled: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+      const groupWithCalendar: Partial<Group> = {
+        ...group,
+        google_calendar_id: 'cal-id@group.calendar.google.com',
+      };
       const invitation: Partial<GroupInvitation> = {
         token: 'acc-cal-fail',
         group_id: groupId,
@@ -652,11 +705,15 @@ describe('InvitationsService', () => {
         group: groupWithCalendar as Group,
       };
 
-      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      invitationsRepository.findOne.mockResolvedValue(
+        invitation as GroupInvitation,
+      );
       usersService.findByEmail.mockResolvedValue(user as User);
       membersRepository.findOne.mockResolvedValue(null);
       usersService.findById.mockResolvedValue(inviter as User);
-      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue('leader-token');
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(
+        'leader-token',
+      );
       googleCalendarService.shareCalendarWithUser.mockResolvedValue(false);
 
       const result = await service.acceptInvitation('acc-cal-fail', {});
@@ -666,8 +723,20 @@ describe('InvitationsService', () => {
     });
 
     it('skips calendar sharing when leader has no access token', async () => {
-      const user: Partial<User> = { id: inviteeUserId, email, full_name: 'Invitee', role: UserRole.USER, is_active: true, notification_enabled: true, created_at: new Date(), updated_at: new Date() };
-      const groupWithCalendar: Partial<Group> = { ...group, google_calendar_id: 'cal-id@group.calendar.google.com' };
+      const user: Partial<User> = {
+        id: inviteeUserId,
+        email,
+        full_name: 'Invitee',
+        role: UserRole.USER,
+        is_active: true,
+        notification_enabled: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+      const groupWithCalendar: Partial<Group> = {
+        ...group,
+        google_calendar_id: 'cal-id@group.calendar.google.com',
+      };
       const invitation: Partial<GroupInvitation> = {
         token: 'acc-cal-no-tok',
         group_id: groupId,
@@ -677,7 +746,9 @@ describe('InvitationsService', () => {
         group: groupWithCalendar as Group,
       };
 
-      invitationsRepository.findOne.mockResolvedValue(invitation as GroupInvitation);
+      invitationsRepository.findOne.mockResolvedValue(
+        invitation as GroupInvitation,
+      );
       usersService.findByEmail.mockResolvedValue(user as User);
       membersRepository.findOne.mockResolvedValue(null);
       usersService.findById.mockResolvedValue(inviter as User);
@@ -685,7 +756,9 @@ describe('InvitationsService', () => {
 
       const result = await service.acceptInvitation('acc-cal-no-tok', {});
 
-      expect(googleCalendarService.shareCalendarWithUser).not.toHaveBeenCalled();
+      expect(
+        googleCalendarService.shareCalendarWithUser,
+      ).not.toHaveBeenCalled();
       expect(result.user.id).toBe(inviteeUserId);
       expect(membersRepository.save).toHaveBeenCalled();
     });
@@ -942,10 +1015,17 @@ describe('InvitationsService', () => {
     it('returns invitations when requester is the leader', async () => {
       groupsRepository.findOne.mockResolvedValue(group as Group);
       invitationsRepository.find.mockResolvedValue([
-        { id: invitationId, email, status: InvitationStatus.PENDING } as GroupInvitation,
+        {
+          id: invitationId,
+          email,
+          status: InvitationStatus.PENDING,
+        } as GroupInvitation,
       ]);
 
-      const result = await service.findGroupInvitationsForLeader(groupId, leaderId);
+      const result = await service.findGroupInvitationsForLeader(
+        groupId,
+        leaderId,
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].email).toBe(email);

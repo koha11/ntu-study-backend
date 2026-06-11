@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { FlashcardsService, nextReviewAtFromScore } from './flashcards.service';
 import { FlashcardSet } from './entities/flashcard-set.entity';
 import { Flashcard } from './entities/flashcard.entity';
@@ -394,7 +399,12 @@ describe('FlashcardsService', () => {
 
   describe('updateSet', () => {
     it('updates name and subject when user owns set', async () => {
-      const existing = { id: setId, owner_id: userId, name: 'Old', subject: null };
+      const existing = {
+        id: setId,
+        owner_id: userId,
+        name: 'Old',
+        subject: null,
+      };
       setsRepository.findOne.mockResolvedValue(existing);
       setsRepository.save.mockImplementation((s: FlashcardSet) =>
         Promise.resolve(s),
@@ -418,7 +428,10 @@ describe('FlashcardsService', () => {
     });
 
     it('throws ForbiddenException when not owner', async () => {
-      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: otherUserId });
+      setsRepository.findOne.mockResolvedValue({
+        id: setId,
+        owner_id: otherUserId,
+      });
 
       await expect(
         service.updateSet(userId, setId, { name: 'X' }),
@@ -486,9 +499,14 @@ describe('FlashcardsService', () => {
 
     it('creates a shared record when owner is a group member', async () => {
       setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: userId });
-      groupMembersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
+      groupMembersRepository.findOne.mockResolvedValue({
+        group_id: groupId,
+        user_id: userId,
+      });
       sharedRepository.findOne.mockResolvedValue(null);
-      sharedRepository.save.mockImplementation((d: unknown) => Promise.resolve({ ...d as object, id: 'share-id' }));
+      sharedRepository.save.mockImplementation((d: unknown) =>
+        Promise.resolve({ ...(d as object), id: 'share-id' }),
+      );
 
       const result = await service.shareSetWithGroup(userId, setId, groupId);
 
@@ -507,7 +525,10 @@ describe('FlashcardsService', () => {
     });
 
     it('throws ForbiddenException when not owner of the set', async () => {
-      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: otherUserId });
+      setsRepository.findOne.mockResolvedValue({
+        id: setId,
+        owner_id: otherUserId,
+      });
 
       await expect(
         service.shareSetWithGroup(userId, setId, groupId),
@@ -525,8 +546,15 @@ describe('FlashcardsService', () => {
 
     it('throws ConflictException when already shared with group', async () => {
       setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: userId });
-      groupMembersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
-      sharedRepository.findOne.mockResolvedValue({ id: 'existing', set_id: setId, group_id: groupId });
+      groupMembersRepository.findOne.mockResolvedValue({
+        group_id: groupId,
+        user_id: userId,
+      });
+      sharedRepository.findOne.mockResolvedValue({
+        id: 'existing',
+        set_id: setId,
+        group_id: groupId,
+      });
 
       await expect(
         service.shareSetWithGroup(userId, setId, groupId),
@@ -556,7 +584,10 @@ describe('FlashcardsService', () => {
     });
 
     it('throws ForbiddenException when not owner', async () => {
-      setsRepository.findOne.mockResolvedValue({ id: setId, owner_id: otherUserId });
+      setsRepository.findOne.mockResolvedValue({
+        id: setId,
+        owner_id: otherUserId,
+      });
 
       await expect(
         service.unshareSetFromGroup(userId, setId, groupId),
@@ -577,7 +608,10 @@ describe('FlashcardsService', () => {
     const groupId = 'gggggggg-gggg-gggg-gggg-gggggggggggg';
 
     it('returns mapped shared set rows when user is a member', async () => {
-      groupMembersRepository.findOne.mockResolvedValue({ group_id: groupId, user_id: userId });
+      groupMembersRepository.findOne.mockResolvedValue({
+        group_id: groupId,
+        user_id: userId,
+      });
       sharedRepository.find.mockResolvedValue([
         {
           id: 'share-1',
@@ -610,9 +644,9 @@ describe('FlashcardsService', () => {
     it('throws ForbiddenException when user is not a group member', async () => {
       groupMembersRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.getGroupSharedSets(userId, groupId),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.getGroupSharedSets(userId, groupId)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
