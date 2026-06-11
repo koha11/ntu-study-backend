@@ -72,7 +72,10 @@ export class GroupsService {
     private readonly configService: ConfigService,
   ) {}
 
-  async create(leaderId: string, dto: CreateGroupDto): Promise<Group> {
+  async create(
+    leaderId: string,
+    dto: CreateGroupDto,
+  ): Promise<{ group: Group; failedInvitations: { email: string; reason: string }[] }> {
     const name = dto.name.trim();
     const reportDate =
       dto.report_date != null && String(dto.report_date).trim() !== ''
