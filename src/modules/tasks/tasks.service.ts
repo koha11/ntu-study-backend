@@ -331,6 +331,24 @@ export class TasksService {
     this.logger.log(`Task ${id} deleted by user ${userId}`);
   }
 
+  /**
+   * Root tasks in pending_review status for all groups where the user is the leader.
+   */
+  async findPendingReviewTasksForLeader(userId: string): Promise<Task[]> {
+    return this.tasksRepository
+      .createQueryBuilder('t')
+      .innerJoin('t.group', 'g', 'g.leader_id = :uid', { uid: userId })
+      .leftJoinAndSelect('t.assignee', 'assignee')
+      .leftJoinAndSelect('t.parent_task', 'parent_task')
+      .leftJoinAndSelect('t.subtasks', 'subtasks')
+      .leftJoinAndSelect('subtasks.assignee', 'subAssignee')
+      .leftJoinAndSelect('subtasks.parent_task', 'subParent')
+      .where('t.status = :status', { status: TaskStatus.PENDING_REVIEW })
+      .andWhere('t.parent_task_id IS NULL')
+      .orderBy('t.submitted_at', 'DESC')
+      .getMany();
+  }
+
   async findOverdueTasks(): Promise<Task[]> {
     const now = new Date();
     return this.tasksRepository

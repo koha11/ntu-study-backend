@@ -74,6 +74,12 @@ export class TasksController {
     description:
       "When 'true', returns root group tasks assigned to or created by the user",
   })
+  @ApiQuery({
+    name: 'pendingReviewAsLeader',
+    required: false,
+    description:
+      "When 'true', returns pending_review tasks in groups where the user is the leader",
+  })
   @ApiResponse({
     status: 200,
     description: 'Tasks retrieved',
@@ -82,6 +88,7 @@ export class TasksController {
     @Req() req: Request,
     @Query('groupId') groupId?: string,
     @Query('assignedInGroups') assignedInGroups?: string,
+    @Query('pendingReviewAsLeader') pendingReviewAsLeader?: string,
     @Query('status') status?: TaskStatus,
   ) {
     const user = req.user as JwtRequestUser;
@@ -93,6 +100,11 @@ export class TasksController {
     if (assignedInGroups === 'true') {
       return this.tasksService
         .findAssignedGroupTasks(user.id)
+        .then((tasks) => tasks.map(serializeTaskForApi));
+    }
+    if (pendingReviewAsLeader === 'true') {
+      return this.tasksService
+        .findPendingReviewTasksForLeader(user.id)
         .then((tasks) => tasks.map(serializeTaskForApi));
     }
     return this.tasksService
