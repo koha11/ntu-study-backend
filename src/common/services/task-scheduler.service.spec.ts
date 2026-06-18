@@ -31,6 +31,7 @@ describe('TaskSchedulerService', () => {
   };
   let emailService: {
     sendBatchedTaskReminderEmail: ReturnType<typeof vi.fn>;
+    sendUpcomingDueTaskReminderToLeaderEmail: ReturnType<typeof vi.fn>;
   };
   let groupEmailThreadService: {
     findByGroupAndUser: ReturnType<typeof vi.fn>;
@@ -75,6 +76,7 @@ describe('TaskSchedulerService', () => {
     };
     emailService = {
       sendBatchedTaskReminderEmail: vi.fn().mockResolvedValue(undefined),
+      sendUpcomingDueTaskReminderToLeaderEmail: vi.fn().mockResolvedValue(undefined),
     };
     groupEmailThreadService = {
       findByGroupAndUser: vi.fn().mockResolvedValue(null),
@@ -316,6 +318,216 @@ describe('TaskSchedulerService', () => {
       const savedRun = cronJobRunsRepository.save.mock.calls[1]?.[0];
       expect(savedRun?.error_message?.length).toBeLessThanOrEqual(8001);
       expect(savedRun?.error_message).toMatch(/…$/);
+    });
+  });
+
+  describe('executeUpcomingDueTaskReminders (via sendUpcomingDueTaskReminders)', () => {
+    const leaderId = 'leader-333-3333-3333-333333333333';
+
+    const makeLeader = (overrides: Partial<User> = {}): User =>
+      ({
+        id: leaderId,
+        email: 'leader@test.com',
+        full_name: 'Group Leader',
+        notification_enabled: true,
+        preferred_language: 'en',
+        ...overrides,
+      }) as User;
+
+    const makeUpcomingTask = (overrides: Partial<Task> = {}): Task => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const leader = makeLeader();
+      return {
+        id: 'task-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        title: 'Upcoming Task',
+        status: TaskStatus.IN_PROGRESS,
+        due_date: tomorrow,
+        assignee: makeUser(),
+        assignee_id: userId,
+        group_id: groupId,
+        group: {
+          id: groupId,
+          name: 'Test Group',
+          leader_id: leaderId,
+          leader,
+        } as Task['group'],
+        ...overrides,
+      } as Task;
+    };
+
+    it('does nothing when there are no upcoming tasks', async () => {
+      tasksRepository.find.mockResolvedValue([]);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      expect(emailService.sendUpcomingDueTaskReminderToLeaderEmail).not.toHaveBeenCalled();
+      expect(notificationsRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('records SUCCESS status when job completes without error', async () => {
+      tasksRepository.find.mockResolvedValue([]);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      const savedRun = cronJobRunsRepository.save.mock.calls[1]?.[0];
+      expect(savedRun?.status).toBe(CronJobRunStatus.SUCCESS);
+    });
+
+    it('records FAILURE status when job throws', async () => {
+      tasksRepository.find.mockRejectedValue(new Error('DB error'));
+
+      await service.sendUpcomingDueTaskReminders();
+
+      const savedRun = cronJobRunsRepository.save.mock.calls[1]?.[0];
+      expect(savedRun?.status).toBe(CronJobRunStatus.FAILURE);
+    });
+
+    it('skips tasks without a group', async () => {
+      const task = makeUpcomingTask({
+        group: null as unknown as Task['group'],
+        group_id: undefined,
+      });
+      tasksRepository.find.mockResolvedValue([task]);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      expect(emailService.sendUpcomingDueTaskReminderToLeaderEmail).not.toHaveBeenCalled();
+      expect(notificationsRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('skips groups without a leader', async () => {
+      const task = makeUpcomingTask({
+        group: {
+          id: groupId,
+          name: 'Test Group',
+          leader_id: null as unknown as string,
+          leader: null as unknown as User,
+        } as Task['group'],
+      });
+      tasksRepository.find.mockResolvedValue([task]);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      expect(emailService.sendUpcomingDueTaskReminderToLeaderEmail).not.toHaveBeenCalled();
+      expect(notificationsRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('creates one in-app notification for the leader per group', async () => {
+      const task = makeUpcomingTask();
+      tasksRepository.find.mockResolvedValue([task]);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      expect(notificationsRepository.save).toHaveBeenCalledOnce();
+      expect(notificationsRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipient_id: leaderId,
+          type: 'Task Due Soon',
+          is_read: false,
+        }),
+      );
+    });
+
+    it('sends email to leader when notification_enabled is true', async () => {
+      const task = makeUpcomingTask();
+      tasksRepository.find.mockResolvedValue([task]);
+      groupEmailThreadService.findByGroupAndUser.mockResolvedValue(null);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      expect(emailService.sendUpcomingDueTaskReminderToLeaderEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: 'leader@test.com',
+          groupName: 'Test Group',
+        }),
+      );
+    });
+
+    it('includes assignee name in task items sent to email', async () => {
+      const task = makeUpcomingTask();
+      tasksRepository.find.mockResolvedValue([task]);
+      groupEmailThreadService.findByGroupAndUser.mockResolvedValue(null);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      expect(emailService.sendUpcomingDueTaskReminderToLeaderEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tasks: expect.arrayContaining([
+            expect.objectContaining({ assigneeName: 'Test User' }),
+          ]),
+        }),
+      );
+    });
+
+    it('skips email but still creates notification when leader notifications disabled', async () => {
+      const leader = makeLeader({ notification_enabled: false });
+      const task = makeUpcomingTask({
+        group: {
+          id: groupId,
+          name: 'Test Group',
+          leader_id: leaderId,
+          leader,
+        } as Task['group'],
+      });
+      tasksRepository.find.mockResolvedValue([task]);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      expect(notificationsRepository.save).toHaveBeenCalled();
+      expect(emailService.sendUpcomingDueTaskReminderToLeaderEmail).not.toHaveBeenCalled();
+    });
+
+    it('sends email in Vietnamese when leader preferred_language is not en', async () => {
+      const leader = makeLeader({ preferred_language: 'vi' });
+      const task = makeUpcomingTask({
+        group: {
+          id: groupId,
+          name: 'Test Group',
+          leader_id: leaderId,
+          leader,
+        } as Task['group'],
+      });
+      tasksRepository.find.mockResolvedValue([task]);
+      groupEmailThreadService.findByGroupAndUser.mockResolvedValue(null);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      expect(emailService.sendUpcomingDueTaskReminderToLeaderEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ lang: 'vi' }),
+      );
+    });
+
+    it('passes thread message id when a thread exists', async () => {
+      const task = makeUpcomingTask();
+      tasksRepository.find.mockResolvedValue([task]);
+      groupEmailThreadService.findByGroupAndUser.mockResolvedValue({
+        thread_message_id: '<thread@ntu-study.local>',
+      });
+
+      await service.sendUpcomingDueTaskReminders();
+
+      expect(emailService.sendUpcomingDueTaskReminderToLeaderEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ threadMessageId: '<thread@ntu-study.local>' }),
+      );
+    });
+
+    it('uses CRON trigger when called from cron schedule', async () => {
+      tasksRepository.find.mockResolvedValue([]);
+
+      await service.sendUpcomingDueTaskReminders();
+
+      const createdRun = cronJobRunsRepository.create.mock.calls[0]?.[0];
+      expect(createdRun?.triggered_by).toBe(CronJobTrigger.CRON);
+    });
+
+    it('runs via runJobBySlug with MANUAL trigger', async () => {
+      tasksRepository.find.mockResolvedValue([]);
+
+      await service.runJobBySlug(CRON_JOB_NAMES.UPCOMING_DUE_TASK_REMINDERS);
+
+      const createdRun = cronJobRunsRepository.create.mock.calls[0]?.[0];
+      expect(createdRun?.triggered_by).toBe(CronJobTrigger.MANUAL);
     });
   });
 

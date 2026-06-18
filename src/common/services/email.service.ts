@@ -572,6 +572,66 @@ export class EmailService {
   }
 
   /**
+   * Sends a batched reminder to the group leader listing members' tasks due within 2 days.
+   */
+  async sendUpcomingDueTaskReminderToLeaderEmail(params: {
+    toEmail: string;
+    groupName: string;
+    tasks: { title: string; assigneeName: string; dueDate: Date }[];
+    groupUrl: string;
+    threadMessageId?: string;
+    lang?: Language;
+  }): Promise<string | null> {
+    const { toEmail, groupName, tasks, groupUrl, threadMessageId, lang } =
+      params;
+    const vi = lang !== Language.EN;
+    const taskRows = tasks
+      .map((t) =>
+        vi
+          ? `<li><strong>${t.title}</strong> (${t.assigneeName}) — hạn ${t.dueDate.toLocaleString()}</li>`
+          : `<li><strong>${t.title}</strong> (${t.assigneeName}) — due ${t.dueDate.toLocaleString()}</li>`,
+      )
+      .join('');
+    return this.send({
+      to: toEmail,
+      subject: vi
+        ? `Nhiệm vụ sắp đến hạn — ${groupName}`
+        : `Upcoming task deadlines — ${groupName}`,
+      html: vi
+        ? `
+        <h2>Nhiệm vụ sắp đến hạn — ${groupName}</h2>
+        <p>Các nhiệm vụ sau đây của thành viên sẽ đến hạn trong 2 ngày tới:</p>
+        <ul>${taskRows}</ul>
+        <p><a href="${groupUrl}">Xem nhiệm vụ nhóm</a></p>
+      `
+        : `
+        <h2>Upcoming task deadlines — ${groupName}</h2>
+        <p>The following member tasks are due within the next 2 days:</p>
+        <ul>${taskRows}</ul>
+        <p><a href="${groupUrl}">Open group tasks</a></p>
+      `,
+      text: vi
+        ? `Nhiệm vụ sắp đến hạn trong ${groupName}:\n` +
+          tasks
+            .map(
+              (t) =>
+                `- ${t.title} (${t.assigneeName}) — hạn ${t.dueDate.toLocaleString()}`,
+            )
+            .join('\n') +
+          `\n${groupUrl}`
+        : `Upcoming task deadlines in ${groupName}:\n` +
+          tasks
+            .map(
+              (t) =>
+                `- ${t.title} (${t.assigneeName}) — due ${t.dueDate.toLocaleString()}`,
+            )
+            .join('\n') +
+          `\n${groupUrl}`,
+      inReplyTo: threadMessageId,
+    });
+  }
+
+  /**
    * Sends a single batched reminder listing all overdue tasks for one group.
    * Replaces the old per-task sendTaskReminder for group tasks.
    */

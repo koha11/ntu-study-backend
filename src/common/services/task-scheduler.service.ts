@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, Between, Not, In, IsNull } from 'typeorm';
 import { EmailService } from './email.service';
 import { GroupEmailThreadService } from './group-email-thread.service';
 import { Task } from '../../modules/tasks/entities/task.entity';
@@ -184,6 +184,106 @@ export class TaskSchedulerService {
   }
 
   /**
+   * Cron job to remind group leaders of member tasks due within 2 days.
+   * Runs daily at 9:00 AM — covers tasks due today, tomorrow, or the day after.
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_9AM)
+  async sendUpcomingDueTaskReminders() {
+    this.logger.log('Starting upcoming due task reminder job...');
+    await this.recordJobRun(
+      CRON_JOB_NAMES.UPCOMING_DUE_TASK_REMINDERS,
+      CronJobTrigger.CRON,
+      () => this.executeUpcomingDueTaskReminders(),
+    );
+  }
+
+  private async executeUpcomingDueTaskReminders(): Promise<void> {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endInclusive = new Date(startOfToday);
+    endInclusive.setDate(endInclusive.getDate() + 2);
+    endInclusive.setHours(23, 59, 59, 999);
+
+    const upcomingTasks = await this.tasksRepository.find({
+      where: {
+        due_date: Between(startOfToday, endInclusive),
+        status: Not(In([TaskStatus.DONE, TaskStatus.FAILED])),
+        group_id: Not(IsNull()),
+        assignee_id: Not(IsNull()),
+      },
+      relations: ['assignee', 'group', 'group.leader'],
+    });
+
+    if (upcomingTasks.length === 0) {
+      this.logger.log('No upcoming group tasks found');
+      return;
+    }
+
+    this.logger.log(`Found ${upcomingTasks.length} upcoming group tasks`);
+
+    // Group by group_id, skipping tasks with no group or no leader
+    const byGroup = new Map<string, typeof upcomingTasks>();
+    for (const task of upcomingTasks) {
+      if (!task.group || !task.group.leader) continue;
+      const gid = task.group_id!;
+      if (!byGroup.has(gid)) byGroup.set(gid, []);
+      byGroup.get(gid)!.push(task);
+    }
+
+    const base = (process.env.FRONTEND_URL ?? 'http://localhost:5173').replace(
+      /\/$/,
+      '',
+    );
+
+    for (const [groupId, tasks] of byGroup.entries()) {
+      const group = tasks[0].group!;
+      const leader = group.leader;
+
+      const leaderVi = leader.preferred_language !== 'en';
+
+      const notification = new Notification();
+      notification.recipient = leader;
+      notification.recipient_id = leader.id;
+      notification.type = 'Task Due Soon';
+      notification.message = leaderVi
+        ? `${tasks.length} nhiệm vụ trong nhóm "${group.name}" sắp đến hạn`
+        : `${tasks.length} task(s) in "${group.name}" are due soon`;
+      notification.is_read = false;
+      notification.delivery_channel = NotificationDeliveryChannel.WEB;
+      await this.notificationsRepository.save(notification);
+
+      if (leader.notification_enabled === false) continue;
+
+      const taskItems = tasks
+        .filter((t) => t.due_date)
+        .map((t) => ({
+          title: t.title,
+          assigneeName: t.assignee?.full_name ?? 'Unknown',
+          dueDate: t.due_date!,
+        }));
+      if (taskItems.length === 0) continue;
+
+      const thread = await this.groupEmailThreadService.findByGroupAndUser(
+        groupId,
+        leader.id,
+      );
+      await this.emailService.sendUpcomingDueTaskReminderToLeaderEmail({
+        toEmail: leader.email,
+        groupName: group.name,
+        tasks: taskItems,
+        groupUrl: `${base}/groups/${groupId}`,
+        threadMessageId: thread?.thread_message_id,
+        lang: leader.preferred_language,
+      });
+    }
+
+    this.logger.log(
+      `Sent upcoming due task reminders for ${byGroup.size} groups`,
+    );
+  }
+
+  /**
    * Cron job to cleanup old notifications
    * Runs daily at midnight
    */
@@ -217,6 +317,12 @@ export class TaskSchedulerService {
           CRON_JOB_NAMES.OVERDUE_TASK_REMINDERS,
           CronJobTrigger.MANUAL,
           () => this.executeOverdueTaskReminders(),
+        );
+      case CRON_JOB_NAMES.UPCOMING_DUE_TASK_REMINDERS:
+        return this.recordJobRun(
+          CRON_JOB_NAMES.UPCOMING_DUE_TASK_REMINDERS,
+          CronJobTrigger.MANUAL,
+          () => this.executeUpcomingDueTaskReminders(),
         );
       case CRON_JOB_NAMES.CLEANUP_OLD_NOTIFICATIONS:
         return this.recordJobRun(
