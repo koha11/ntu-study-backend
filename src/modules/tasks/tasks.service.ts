@@ -9,18 +9,29 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Task } from './entities/task.entity';
+import { TaskOutcomeLink } from './entities/task-outcome-link.entity';
 import { GroupMember } from '@modules/groups/entities/group-member.entity';
 import { Group } from '@modules/groups/entities/group.entity';
 import { GroupStatus, TaskStatus } from '@common/enums';
-import type { CreateTaskDto, UpdateTaskDto } from './dto/task.dto';
+import type { AddOutcomeLinkDto, CreateTaskDto, UpdateTaskDto } from './dto/task.dto';
 import { NotificationsService } from '@modules/notifications/notifications.service';
 import { UsersService } from '@modules/users/users.service';
 import { EmailService } from '@common/services/email.service';
+import { GoogleDriveService as CommonGoogleDriveService } from '@common/services/google-drive.service';
+import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
 import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 import {
   NOTIFICATION_TYPE,
   RELATED_ENTITY_TYPE,
 } from '@common/constants/notification-types';
+
+export interface DriveFileDto {
+  id: string;
+  name: string;
+  mimeType: string;
+  webViewLink?: string;
+  modifiedTime?: string;
+}
 
 const TASK_DETAIL_RELATIONS = [
   'assignee',
@@ -37,6 +48,8 @@ export class TasksService {
   constructor(
     @InjectRepository(Task)
     private readonly tasksRepository: Repository<Task>,
+    @InjectRepository(TaskOutcomeLink)
+    private readonly outcomeLinkRepository: Repository<TaskOutcomeLink>,
     @InjectRepository(GroupMember)
     private readonly membersRepository: Repository<GroupMember>,
     @InjectRepository(Group)
@@ -46,6 +59,8 @@ export class TasksService {
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
     private readonly groupEmailThreadService: GroupEmailThreadService,
+    private readonly commonGoogleDriveService: CommonGoogleDriveService,
+    private readonly googleAccessTokenService: GoogleAccessTokenService,
   ) {}
 
   async create(userId: string, dto: CreateTaskDto): Promise<Task> {
@@ -93,9 +108,16 @@ export class TasksService {
       assignee_id: dto.assignee_id ?? userId,
       due_date: dto.due_date ? new Date(dto.due_date) : undefined,
       status: TaskStatus.TODO,
+      expected_outcome_type: dto.expected_outcome_type,
+      expected_outcome_description: dto.expected_outcome_description?.trim(),
     });
 
     const saved = await this.tasksRepository.save(task);
+
+    if (groupId && !parentTaskId) {
+      await this.maybeCreateTaskDriveFolder(saved, userId, groupId);
+    }
+
     const reloaded =
       (await this.tasksRepository.findOne({
         where: { id: saved.id },
@@ -219,6 +241,12 @@ export class TasksService {
     }
     if (dto.status !== undefined) {
       task.status = dto.status;
+    }
+    if (dto.expected_outcome_type !== undefined) {
+      task.expected_outcome_type = dto.expected_outcome_type;
+    }
+    if (dto.expected_outcome_description !== undefined) {
+      task.expected_outcome_description = dto.expected_outcome_description?.trim();
     }
 
     await this.tasksRepository.save(task);
@@ -363,6 +391,184 @@ export class TasksService {
         ],
       })
       .getMany();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Outcome links
+  // ---------------------------------------------------------------------------
+
+  async listOutcomeLinks(
+    taskId: string,
+    userId: string,
+  ): Promise<TaskOutcomeLink[]> {
+    const task = await this.tasksRepository.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('Task not found');
+    await this.assertCanAccessTask(task, userId);
+    return this.outcomeLinkRepository.find({
+      where: { task_id: taskId },
+      order: { created_at: 'ASC' },
+    });
+  }
+
+  async addOutcomeLink(
+    taskId: string,
+    userId: string,
+    dto: AddOutcomeLinkDto,
+  ): Promise<TaskOutcomeLink> {
+    const task = await this.tasksRepository.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('Task not found');
+    this.assertIsAssignee(task, userId);
+    const link = this.outcomeLinkRepository.create({
+      task_id: taskId,
+      url: dto.url,
+      label: dto.label,
+      created_by_id: userId,
+    });
+    return this.outcomeLinkRepository.save(link);
+  }
+
+  async removeOutcomeLink(
+    taskId: string,
+    linkId: string,
+    userId: string,
+  ): Promise<void> {
+    const link = await this.outcomeLinkRepository.findOne({
+      where: { id: linkId, task_id: taskId },
+    });
+    if (!link) throw new NotFoundException('Outcome link not found');
+    const task = await this.tasksRepository.findOne({ where: { id: taskId } });
+    if (task) this.assertIsAssignee(task, userId);
+    await this.outcomeLinkRepository.remove(link);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Outcome files (Google Drive)
+  // ---------------------------------------------------------------------------
+
+  async listOutcomeFiles(
+    taskId: string,
+    userId: string,
+  ): Promise<DriveFileDto[]> {
+    const task = await this.tasksRepository.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('Task not found');
+    await this.assertCanAccessTask(task, userId);
+    if (!task.drive_folder_id) return [];
+    const accessToken = await this.resolveAccessToken(userId);
+    if (!accessToken) return [];
+    const files = await this.commonGoogleDriveService.listFiles(
+      accessToken,
+      task.drive_folder_id,
+      100,
+    );
+    return (files ?? []).map(
+      (f: {
+        id?: string;
+        name?: string;
+        mimeType?: string;
+        webViewLink?: string;
+        modifiedTime?: string;
+      }) => ({
+        id: f.id ?? '',
+        name: f.name ?? '',
+        mimeType: f.mimeType ?? '',
+        webViewLink: f.webViewLink,
+        modifiedTime: f.modifiedTime,
+      }),
+    );
+  }
+
+  async uploadOutcomeFile(
+    taskId: string,
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<{ id: string; name: string; webViewLink?: string }> {
+    const task = await this.tasksRepository.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('Task not found');
+    this.assertIsAssignee(task, userId);
+    if (!task.drive_folder_id)
+      throw new BadRequestException('This task has no Drive folder');
+    const accessToken = await this.resolveAccessToken(userId);
+    if (!accessToken)
+      throw new ForbiddenException('Google Drive access required');
+    const mime =
+      file.mimetype && file.mimetype !== ''
+        ? file.mimetype
+        : 'application/octet-stream';
+    const result = await this.commonGoogleDriveService.uploadFile(
+      accessToken,
+      file.originalname,
+      file.buffer,
+      mime,
+      task.drive_folder_id,
+    );
+    return {
+      id: result.id ?? '',
+      name: result.name ?? file.originalname,
+      webViewLink: result.webViewLink,
+    };
+  }
+
+  async deleteOutcomeFile(
+    taskId: string,
+    userId: string,
+    fileId: string,
+  ): Promise<void> {
+    const task = await this.tasksRepository.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('Task not found');
+    this.assertIsAssignee(task, userId);
+    if (!task.drive_folder_id)
+      throw new BadRequestException('This task has no Drive folder');
+    const accessToken = await this.resolveAccessToken(userId);
+    if (!accessToken)
+      throw new ForbiddenException('Google Drive access required');
+    await this.commonGoogleDriveService.deleteFile(accessToken, fileId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers (new)
+  // ---------------------------------------------------------------------------
+
+  private assertIsAssignee(task: Task, userId: string): void {
+    if (task.assignee_id !== userId) {
+      throw new ForbiddenException(
+        'Only the task assignee can manage outcome files and links',
+      );
+    }
+  }
+
+  private async resolveAccessToken(userId: string): Promise<string | null> {
+    const user = await this.usersService.findById(userId, true);
+    if (!user) return null;
+    return this.googleAccessTokenService.resolveGoogleAccessToken(user);
+  }
+
+  private async maybeCreateTaskDriveFolder(
+    task: Task,
+    userId: string,
+    groupId: string,
+  ): Promise<void> {
+    try {
+      const group = await this.groupsRepository.findOne({
+        where: { id: groupId },
+        select: ['id', 'drive_folder_id'],
+      });
+      if (!group?.drive_folder_id) return;
+      const accessToken = await this.resolveAccessToken(userId);
+      if (!accessToken) return;
+      const folder = await this.commonGoogleDriveService.createFolder(
+        accessToken,
+        `[Task] ${task.title}`,
+        group.drive_folder_id,
+      );
+      if (folder?.id) {
+        task.drive_folder_id = folder.id;
+        await this.tasksRepository.save(task);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Could not create Drive folder for task ${task.id}: ${String(err)}`,
+      );
+    }
   }
 
   private async reloadTaskWithRelations(id: string): Promise<Task> {

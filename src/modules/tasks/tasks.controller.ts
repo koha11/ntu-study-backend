@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -8,16 +9,20 @@ import {
   Param,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiConsumes,
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
@@ -25,6 +30,7 @@ import type { JwtRequestUser } from '@modules/auth/types/jwt-request-user';
 import { TasksService } from './tasks.service';
 import { serializeTaskForApi } from './task-response.mapper';
 import {
+  AddOutcomeLinkDto,
   CreateTaskDto,
   UpdateTaskDto,
   SubmitTaskDto,
@@ -186,5 +192,88 @@ export class TasksController {
   ): Promise<void> {
     const user = req.user as JwtRequestUser;
     await this.tasksService.deleteTask(id, user.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Outcome links
+  // ---------------------------------------------------------------------------
+
+  @Get(':id/outcome-links')
+  @ApiOperation({ summary: 'List outcome links for a task' })
+  @ApiResponse({ status: 200, description: 'Outcome links retrieved' })
+  listOutcomeLinks(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as JwtRequestUser;
+    return this.tasksService.listOutcomeLinks(id, user.id);
+  }
+
+  @Post(':id/outcome-links')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Add an outcome link to a task (assignee only)' })
+  @ApiResponse({ status: 201, description: 'Link added' })
+  addOutcomeLink(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() dto: AddOutcomeLinkDto,
+  ) {
+    const user = req.user as JwtRequestUser;
+    return this.tasksService.addOutcomeLink(id, user.id, dto);
+  }
+
+  @Delete(':id/outcome-links/:linkId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove an outcome link (assignee only)' })
+  @ApiResponse({ status: 204, description: 'Link removed' })
+  async removeOutcomeLink(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Param('linkId') linkId: string,
+  ): Promise<void> {
+    const user = req.user as JwtRequestUser;
+    await this.tasksService.removeOutcomeLink(id, linkId, user.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Outcome files (Google Drive)
+  // ---------------------------------------------------------------------------
+
+  @Get(':id/files')
+  @ApiOperation({ summary: 'List outcome files in the task Drive folder' })
+  @ApiResponse({ status: 200, description: 'Files retrieved' })
+  listOutcomeFiles(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as JwtRequestUser;
+    return this.tasksService.listOutcomeFiles(id, user.id);
+  }
+
+  @Post(':id/files')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Upload a file to the task Drive folder (assignee only)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 201, description: 'File uploaded' })
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 52_428_800 } }),
+  )
+  uploadOutcomeFile(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    const user = req.user as JwtRequestUser;
+    if (!file?.originalname) {
+      throw new BadRequestException('File is required');
+    }
+    return this.tasksService.uploadOutcomeFile(id, user.id, file);
+  }
+
+  @Delete(':id/files/:fileId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete an outcome file from Drive (assignee only)' })
+  @ApiResponse({ status: 204, description: 'File deleted' })
+  async deleteOutcomeFile(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Param('fileId') fileId: string,
+  ): Promise<void> {
+    const user = req.user as JwtRequestUser;
+    await this.tasksService.deleteOutcomeFile(id, user.id, fileId);
   }
 }

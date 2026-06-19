@@ -6,10 +6,11 @@ import {
   Index,
   JoinColumn,
 } from 'typeorm';
-import { TaskStatus } from '@common/enums';
+import { ExpectedOutcomeType, TaskStatus } from '@common/enums';
 import { BaseEntity } from '@common/entities/base.entity';
 import { User } from '@modules/users/entities/user.entity';
 import { Group } from '@modules/groups/entities/group.entity';
+import { TaskOutcomeLink } from './task-outcome-link.entity';
 
 @Entity('tasks')
 @Index(['group_id'])
@@ -86,4 +87,21 @@ export class Task extends BaseEntity {
 
   @Column({ name: 'reviewed_by_id', type: 'uuid', nullable: true })
   reviewed_by_id?: string;
+
+  @Column({
+    type: 'enum',
+    enum: ExpectedOutcomeType,
+    default: ExpectedOutcomeType.NONE,
+    name: 'expected_outcome_type',
+  })
+  expected_outcome_type!: ExpectedOutcomeType;
+
+  @Column({ type: 'text', nullable: true, name: 'expected_outcome_description' })
+  expected_outcome_description?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'drive_folder_id' })
+  drive_folder_id?: string;
+
+  @OneToMany(() => TaskOutcomeLink, (link) => link.task)
+  outcome_links!: TaskOutcomeLink[];
 }

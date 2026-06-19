@@ -9,12 +9,15 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { TasksService } from './tasks.service';
 import { Task } from './entities/task.entity';
+import { TaskOutcomeLink } from './entities/task-outcome-link.entity';
 import { GroupMember } from '@modules/groups/entities/group-member.entity';
 import { Group } from '@modules/groups/entities/group.entity';
-import { TaskStatus } from '@common/enums';
+import { ExpectedOutcomeType, TaskStatus } from '@common/enums';
 import { NotificationsService } from '@modules/notifications/notifications.service';
 import { UsersService } from '@modules/users/users.service';
 import { EmailService } from '@common/services/email.service';
+import { GoogleDriveService as CommonGoogleDriveService } from '@common/services/google-drive.service';
+import { GoogleAccessTokenService } from '@modules/auth/services/google-access-token.service';
 import { GroupEmailThreadService } from '@common/services/group-email-thread.service';
 import { NOTIFICATION_TYPE } from '@common/constants/notification-types';
 
@@ -35,7 +38,10 @@ describe('TasksService', () => {
     findOne: ReturnType<typeof vi.fn>;
   };
   let notificationsService: { createNotification: ReturnType<typeof vi.fn> };
-  let usersService: { findOne: ReturnType<typeof vi.fn> };
+  let usersService: {
+    findOne: ReturnType<typeof vi.fn>;
+    findById: ReturnType<typeof vi.fn>;
+  };
   let emailService: {
     sendTaskAssignedEmail: ReturnType<typeof vi.fn>;
     sendTaskPendingReviewEmail: ReturnType<typeof vi.fn>;
@@ -43,6 +49,23 @@ describe('TasksService', () => {
   };
   let configService: { get: ReturnType<typeof vi.fn> };
   let groupEmailThreadService: { findByGroupAndUser: ReturnType<typeof vi.fn> };
+  let outcomeLinkRepository: {
+    create: ReturnType<typeof vi.fn>;
+    save: ReturnType<typeof vi.fn>;
+    findOne: ReturnType<typeof vi.fn>;
+    find: ReturnType<typeof vi.fn>;
+    remove: ReturnType<typeof vi.fn>;
+  };
+  let googleAccessTokenService: {
+    resolveGoogleAccessToken: ReturnType<typeof vi.fn>;
+  };
+  let commonGoogleDriveService: {
+    createFolder: ReturnType<typeof vi.fn>;
+    uploadFile: ReturnType<typeof vi.fn>;
+    listFiles: ReturnType<typeof vi.fn>;
+    deleteFile: ReturnType<typeof vi.fn>;
+    isResourceUnderFolder: ReturnType<typeof vi.fn>;
+  };
 
   const userId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   const otherUserId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -89,12 +112,33 @@ describe('TasksService', () => {
 
     usersService = {
       findOne: vi.fn(),
+      findById: vi.fn(),
     };
 
     emailService = {
       sendTaskAssignedEmail: vi.fn().mockResolvedValue(true),
       sendTaskPendingReviewEmail: vi.fn().mockResolvedValue(true),
       sendTaskReviewResultEmail: vi.fn().mockResolvedValue(true),
+    };
+
+    outcomeLinkRepository = {
+      create: vi.fn((dto: Partial<TaskOutcomeLink>) => ({ ...dto, id: 'link-id-1' })),
+      save: vi.fn((l: TaskOutcomeLink) => Promise.resolve({ ...l, id: l.id ?? 'link-id-1' })),
+      findOne: vi.fn(),
+      find: vi.fn().mockResolvedValue([]),
+      remove: vi.fn().mockResolvedValue(undefined),
+    };
+
+    googleAccessTokenService = {
+      resolveGoogleAccessToken: vi.fn().mockResolvedValue('test-access-token'),
+    };
+
+    commonGoogleDriveService = {
+      createFolder: vi.fn().mockResolvedValue({ id: 'drive-folder-id', name: '[Task] Test', webViewLink: 'https://drive.google.com/folder' }),
+      uploadFile: vi.fn().mockResolvedValue({ id: 'drive-file-id', name: 'file.pdf', webViewLink: 'https://drive.google.com/file' }),
+      listFiles: vi.fn().mockResolvedValue([]),
+      deleteFile: vi.fn().mockResolvedValue(true),
+      isResourceUnderFolder: vi.fn().mockResolvedValue(true),
     };
 
     configService = {
@@ -114,11 +158,23 @@ describe('TasksService', () => {
           useValue: membersRepository,
         },
         { provide: getRepositoryToken(Group), useValue: groupsRepository },
+        {
+          provide: getRepositoryToken(TaskOutcomeLink),
+          useValue: outcomeLinkRepository,
+        },
         { provide: NotificationsService, useValue: notificationsService },
         { provide: UsersService, useValue: usersService },
         { provide: EmailService, useValue: emailService },
         { provide: ConfigService, useValue: configService },
         { provide: GroupEmailThreadService, useValue: groupEmailThreadService },
+        {
+          provide: GoogleAccessTokenService,
+          useValue: googleAccessTokenService,
+        },
+        {
+          provide: CommonGoogleDriveService,
+          useValue: commonGoogleDriveService,
+        },
       ],
     }).compile();
 
@@ -1267,6 +1323,477 @@ describe('TasksService', () => {
 
       expect(notificationsService.createNotification).toHaveBeenCalled();
       expect(emailService.sendTaskPendingReviewEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // create — expected outcome fields
+  // -------------------------------------------------------------------------
+
+  describe('create — expected_outcome_type', () => {
+    it('stores expected_outcome_type in task', async () => {
+      const dto = {
+        title: 'Outcome task',
+        expected_outcome_type: ExpectedOutcomeType.DOCUMENT,
+      };
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        title: 'Outcome task',
+        expected_outcome_type: ExpectedOutcomeType.DOCUMENT,
+        created_by_id: userId,
+        assignee_id: userId,
+        group_id: undefined,
+        status: TaskStatus.TODO,
+        subtasks: [],
+      } as unknown as Task);
+
+      await service.create(userId, dto);
+
+      expect(tasksRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expected_outcome_type: ExpectedOutcomeType.DOCUMENT,
+        }),
+      );
+    });
+
+    it('stores expected_outcome_description when provided', async () => {
+      const dto = {
+        title: 'Task with desc',
+        expected_outcome_type: ExpectedOutcomeType.OTHER,
+        expected_outcome_description: 'Deliver a summary PDF',
+      };
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        title: 'Task with desc',
+        expected_outcome_type: ExpectedOutcomeType.OTHER,
+        expected_outcome_description: 'Deliver a summary PDF',
+        created_by_id: userId,
+        assignee_id: userId,
+        group_id: undefined,
+        status: TaskStatus.TODO,
+        subtasks: [],
+      } as unknown as Task);
+
+      await service.create(userId, dto);
+
+      expect(tasksRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expected_outcome_description: 'Deliver a summary PDF',
+        }),
+      );
+    });
+
+    it('creates Drive folder when group has drive_folder_id', async () => {
+      const driveFolderId = 'group-drive-folder';
+      membersRepository.findOne.mockResolvedValue({
+        id: 'm1',
+        group_id: groupId,
+        user_id: userId,
+        is_active: true,
+      });
+      const savedTask = {
+        id: taskId,
+        title: 'Drive task',
+        group_id: groupId,
+        created_by_id: userId,
+        assignee_id: userId,
+        expected_outcome_type: ExpectedOutcomeType.DOCUMENT,
+        drive_folder_id: undefined as string | undefined,
+        status: TaskStatus.TODO,
+        parent_task: null,
+        subtasks: [],
+      };
+      tasksRepository.findOne.mockResolvedValue(savedTask as unknown as Task);
+      tasksRepository.save.mockImplementation((t: unknown) =>
+        Promise.resolve({ ...savedTask, ...(t as object) }),
+      );
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'Group',
+        drive_folder_id: driveFolderId,
+        status: 'active',
+      } as Group);
+      usersService.findById.mockResolvedValue({
+        id: userId,
+        google_access_token: 'tok',
+        token_expires_at: new Date(Date.now() + 999_999),
+      });
+
+      await service.create(userId, {
+        title: 'Drive task',
+        group_id: groupId,
+        expected_outcome_type: ExpectedOutcomeType.DOCUMENT,
+      });
+
+      expect(commonGoogleDriveService.createFolder).toHaveBeenCalledWith(
+        'test-access-token',
+        '[Task] Drive task',
+        driveFolderId,
+      );
+      expect(tasksRepository.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips Drive folder creation when group has no drive_folder_id', async () => {
+      membersRepository.findOne.mockResolvedValue({
+        id: 'm1',
+        group_id: groupId,
+        user_id: userId,
+        is_active: true,
+      });
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        title: 'No drive',
+        group_id: groupId,
+        created_by_id: userId,
+        assignee_id: userId,
+        expected_outcome_type: ExpectedOutcomeType.NONE,
+        status: TaskStatus.TODO,
+        subtasks: [],
+      } as unknown as Task);
+      tasksRepository.save.mockImplementation((t: unknown) =>
+        Promise.resolve({ id: taskId, ...(t as object) }),
+      );
+      groupsRepository.findOne.mockResolvedValue({
+        id: groupId,
+        name: 'Group',
+        drive_folder_id: undefined,
+        status: 'active',
+      } as unknown as Group);
+
+      await service.create(userId, {
+        title: 'No drive',
+        group_id: groupId,
+        expected_outcome_type: ExpectedOutcomeType.NONE,
+      });
+
+      expect(commonGoogleDriveService.createFolder).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // outcome links
+  // -------------------------------------------------------------------------
+
+  describe('listOutcomeLinks', () => {
+    it('throws NotFound when task missing', async () => {
+      tasksRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.listOutcomeLinks(taskId, userId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('returns links when user can access task', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+      });
+      outcomeLinkRepository.find.mockResolvedValue([
+        { id: 'link1', task_id: taskId, url: 'https://example.com', label: 'Ref' },
+      ]);
+
+      const links = await service.listOutcomeLinks(taskId, userId);
+
+      expect(links).toHaveLength(1);
+      expect(outcomeLinkRepository.find).toHaveBeenCalledWith({
+        where: { task_id: taskId },
+        order: { created_at: 'ASC' },
+      });
+    });
+  });
+
+  describe('addOutcomeLink', () => {
+    it('throws NotFound when task missing', async () => {
+      tasksRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.addOutcomeLink(taskId, userId, { url: 'https://x.com' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws Forbidden when user is not the assignee', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: otherUserId,
+        assignee_id: otherUserId,
+      });
+
+      await expect(
+        service.addOutcomeLink(taskId, userId, { url: 'https://x.com' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('creates and returns the outcome link', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+      });
+
+      const link = await service.addOutcomeLink(taskId, userId, {
+        url: 'https://docs.google.com/file',
+        label: 'Draft',
+      });
+
+      expect(outcomeLinkRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          task_id: taskId,
+          url: 'https://docs.google.com/file',
+          label: 'Draft',
+          created_by_id: userId,
+        }),
+      );
+      expect(outcomeLinkRepository.save).toHaveBeenCalled();
+      expect(link.url).toBe('https://docs.google.com/file');
+    });
+  });
+
+  describe('removeOutcomeLink', () => {
+    it('throws NotFound when link missing', async () => {
+      outcomeLinkRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.removeOutcomeLink(taskId, 'link-missing', userId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws Forbidden when user is not the assignee', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: otherUserId,
+        assignee_id: otherUserId,
+      });
+      outcomeLinkRepository.findOne.mockResolvedValue({
+        id: 'link1',
+        task_id: taskId,
+        url: 'https://x.com',
+      });
+
+      await expect(
+        service.removeOutcomeLink(taskId, 'link1', userId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('removes the link when user is assignee', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+      });
+      const link = { id: 'link1', task_id: taskId, url: 'https://x.com' };
+      outcomeLinkRepository.findOne.mockResolvedValue(link);
+
+      await service.removeOutcomeLink(taskId, 'link1', userId);
+
+      expect(outcomeLinkRepository.remove).toHaveBeenCalledWith(link);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // outcome files
+  // -------------------------------------------------------------------------
+
+  describe('listOutcomeFiles', () => {
+    it('throws NotFound when task missing', async () => {
+      tasksRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.listOutcomeFiles(taskId, userId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('returns empty array when task has no drive_folder_id', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+        drive_folder_id: undefined,
+      });
+
+      const files = await service.listOutcomeFiles(taskId, userId);
+
+      expect(files).toEqual([]);
+      expect(commonGoogleDriveService.listFiles).not.toHaveBeenCalled();
+    });
+
+    it('returns Drive files when task has drive_folder_id', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+        drive_folder_id: 'task-folder-id',
+      });
+      usersService.findById.mockResolvedValue({
+        id: userId,
+        google_access_token: 'tok',
+        token_expires_at: new Date(Date.now() + 999_999),
+      });
+      commonGoogleDriveService.listFiles.mockResolvedValue([
+        { id: 'f1', name: 'report.pdf', mimeType: 'application/pdf', webViewLink: 'https://drive/f1' },
+      ]);
+
+      const files = await service.listOutcomeFiles(taskId, userId);
+
+      expect(files).toHaveLength(1);
+      expect(commonGoogleDriveService.listFiles).toHaveBeenCalledWith(
+        'test-access-token',
+        'task-folder-id',
+        100,
+      );
+    });
+  });
+
+  describe('uploadOutcomeFile', () => {
+    const mockFile = {
+      originalname: 'report.pdf',
+      buffer: Buffer.from('content'),
+      mimetype: 'application/pdf',
+    } as Express.Multer.File;
+
+    it('throws NotFound when task missing', async () => {
+      tasksRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.uploadOutcomeFile(taskId, userId, mockFile),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws Forbidden when user is not the assignee', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: otherUserId,
+        assignee_id: otherUserId,
+        drive_folder_id: 'task-folder-id',
+      });
+
+      await expect(
+        service.uploadOutcomeFile(taskId, userId, mockFile),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequest when task has no drive_folder_id', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+        drive_folder_id: undefined,
+      });
+
+      await expect(
+        service.uploadOutcomeFile(taskId, userId, mockFile),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws Forbidden when no Google access token', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+        drive_folder_id: 'task-folder-id',
+      });
+      usersService.findById.mockResolvedValue({ id: userId });
+      googleAccessTokenService.resolveGoogleAccessToken.mockResolvedValue(null);
+
+      await expect(
+        service.uploadOutcomeFile(taskId, userId, mockFile),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('uploads file and returns Drive metadata', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+        drive_folder_id: 'task-folder-id',
+      });
+      usersService.findById.mockResolvedValue({
+        id: userId,
+        google_access_token: 'tok',
+        token_expires_at: new Date(Date.now() + 999_999),
+      });
+
+      const result = await service.uploadOutcomeFile(taskId, userId, mockFile);
+
+      expect(commonGoogleDriveService.uploadFile).toHaveBeenCalledWith(
+        'test-access-token',
+        'report.pdf',
+        mockFile.buffer,
+        'application/pdf',
+        'task-folder-id',
+      );
+      expect(result.id).toBe('drive-file-id');
+    });
+  });
+
+  describe('deleteOutcomeFile', () => {
+    it('throws NotFound when task missing', async () => {
+      tasksRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.deleteOutcomeFile(taskId, userId, 'file1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws Forbidden when user is not the assignee', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: otherUserId,
+        assignee_id: otherUserId,
+        drive_folder_id: 'task-folder-id',
+      });
+
+      await expect(
+        service.deleteOutcomeFile(taskId, userId, 'file1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequest when task has no drive_folder_id', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+        drive_folder_id: undefined,
+      });
+
+      await expect(
+        service.deleteOutcomeFile(taskId, userId, 'file1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('deletes file from Drive', async () => {
+      tasksRepository.findOne.mockResolvedValue({
+        id: taskId,
+        group_id: null,
+        created_by_id: userId,
+        assignee_id: userId,
+        drive_folder_id: 'task-folder-id',
+      });
+      usersService.findById.mockResolvedValue({
+        id: userId,
+        google_access_token: 'tok',
+        token_expires_at: new Date(Date.now() + 999_999),
+      });
+
+      await service.deleteOutcomeFile(taskId, userId, 'file1');
+
+      expect(commonGoogleDriveService.deleteFile).toHaveBeenCalledWith(
+        'test-access-token',
+        'file1',
+      );
     });
   });
 });

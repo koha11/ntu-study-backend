@@ -4,8 +4,9 @@ import {
   IsOptional,
   IsEnum,
   IsUUID,
+  IsUrl,
 } from 'class-validator';
-import { TaskStatus } from '@common/enums';
+import { ExpectedOutcomeType, TaskStatus } from '@common/enums';
 
 export class CreateTaskDto {
   @IsString()
@@ -30,6 +31,14 @@ export class CreateTaskDto {
   @IsUUID()
   @IsOptional()
   parent_task_id?: string;
+
+  @IsEnum(ExpectedOutcomeType)
+  @IsNotEmpty()
+  expected_outcome_type!: ExpectedOutcomeType;
+
+  @IsString()
+  @IsOptional()
+  expected_outcome_description?: string;
 }
 
 export class UpdateTaskDto {
@@ -51,6 +60,24 @@ export class UpdateTaskDto {
 
   @IsOptional()
   due_date?: Date;
+
+  @IsEnum(ExpectedOutcomeType)
+  @IsOptional()
+  expected_outcome_type?: ExpectedOutcomeType;
+
+  @IsString()
+  @IsOptional()
+  expected_outcome_description?: string;
+}
+
+export class AddOutcomeLinkDto {
+  @IsUrl({}, { message: 'url must be a valid URL' })
+  @IsNotEmpty()
+  url!: string;
+
+  @IsString()
+  @IsOptional()
+  label?: string;
 }
 
 export class SubmitTaskDto {
